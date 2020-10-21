@@ -173,7 +173,7 @@ class FunctionExecutor:
 
     def map(self, map_function, map_iterdata, extra_args=None, extra_env=None, runtime_memory=None,
             chunk_size=None, chunk_n=None, timeout=None, invoke_pool_threads=500,
-            include_modules=[], exclude_modules=[]):
+            include_modules=[], exclude_modules=[], dynamic_memory=False):
         """
         :param map_function: the function to map over the data
         :param map_iterdata: An iterable of input data
@@ -210,7 +210,8 @@ class FunctionExecutor:
                              invoke_pool_threads=invoke_pool_threads,
                              include_modules=include_modules,
                              exclude_modules=exclude_modules,
-                             execution_timeout=timeout)
+                             execution_timeout=timeout,
+                             dynamic_memory=dynamic_memory)
 
         futures = self.invoker.run(job)
         self.futures.extend(futures)

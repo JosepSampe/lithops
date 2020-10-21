@@ -32,10 +32,24 @@ from lithops.config import MAX_AGG_DATA_SIZE, JOBS_PREFIX
 logger = logging.getLogger(__name__)
 
 
+def calculate_memory_per_invocation(map_iterdata):
+    memory = []
+    
+    available_mems = list(range(256, 2048+1, 64))
+
+    for obj in map_iterdata:
+        calc_mem = (obj['obj'].chunk_size / 1024**2)*64
+        final_mem = min(available_mems, key=lambda x:abs(x-calc_mem))
+        print(obj['obj'].key, calc_mem, final_mem)
+        memory.append(final_mem)
+
+    return memory
+
+
 def create_map_job(config, internal_storage, executor_id, job_id, map_function, iterdata, runtime_meta,
                    runtime_memory=None, extra_args=None, extra_env=None, obj_chunk_size=None,
                    obj_chunk_number=None, invoke_pool_threads=128, include_modules=[], exclude_modules=[],
-                   execution_timeout=None):
+                   execution_timeout=None, dynamic_memory=False):
     """
     Wrapper to create a map job.  It integrates COS logic to process objects.
     """
@@ -76,6 +90,9 @@ def create_map_job(config, internal_storage, executor_id, job_id, map_function, 
 
     if parts_per_object:
         job_description['parts_per_object'] = parts_per_object
+
+    if is_object_processing_function(map_function) and dynamic_memory:
+        job_description['map_memory'] = calculate_memory_per_invocation(map_iterdata)
 
     return job_description
 

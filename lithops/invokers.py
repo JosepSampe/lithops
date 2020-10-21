@@ -81,52 +81,53 @@ class ServerlessInvoker:
         file does not exists in the storage, this means that the runtime is not
         installed, so this method will proceed to install it.
         """
-        runtime_name = self.config['serverless']['runtime']
-        if runtime_memory is None:
-            runtime_memory = self.config['serverless']['runtime_memory']
-
-        if runtime_memory:
-            runtime_memory = int(runtime_memory)
-            log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {} - {}MB'
-                       .format(self.executor_id, job_id, runtime_name, runtime_memory))
-        else:
-            log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {}'
-                       .format(self.executor_id, job_id, runtime_name))
-        logger.info(log_msg)
-        if not self.log_active:
-            print(log_msg, end=' ')
-
-        installing = False
-
-        runtime_key = self.compute_handler.get_runtime_key(runtime_name, runtime_memory)
-        runtime_deployed = True
-        try:
-            runtime_meta = self.internal_storage.get_runtime_meta(runtime_key)
-        except Exception:
-            runtime_deployed = False
-
-        if not runtime_deployed:
-            logger.debug('ExecutorID {} | JobID {} - Runtime {} with {}MB is not yet '
-                         'installed'.format(self.executor_id, job_id, runtime_name, runtime_memory))
-            if not self.log_active and not installing:
-                installing = True
-                print('(Installing...)')
-
-            timeout = self.config['serverless']['runtime_timeout']
-            logger.debug('Creating runtime: {}, memory: {}MB'.format(runtime_name, runtime_memory))
-            runtime_meta = self.compute_handler.create_runtime(runtime_name, runtime_memory, timeout=timeout)
-            self.internal_storage.put_runtime_meta(runtime_key, runtime_meta)
-
-        py_local_version = version_str(sys.version_info)
-        py_remote_version = runtime_meta['python_ver']
-
-        if py_local_version != py_remote_version:
-            raise Exception(("The indicated runtime '{}' is running Python {} and it "
-                             "is not compatible with the local Python version {}")
-                            .format(runtime_name, py_remote_version, py_local_version))
-
-        if not self.log_active and runtime_deployed:
-            print()
+        for runtime_memory in range(256, 2048+1, 64):
+            runtime_name = self.config['serverless']['runtime']
+            if runtime_memory is None:
+                runtime_memory = self.config['serverless']['runtime_memory']
+    
+            if runtime_memory:
+                runtime_memory = int(runtime_memory)
+                log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {} - {}MB'
+                           .format(self.executor_id, job_id, runtime_name, runtime_memory))
+            else:
+                log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {}'
+                           .format(self.executor_id, job_id, runtime_name))
+            logger.info(log_msg)
+            if not self.log_active:
+                print(log_msg, end=' ')
+    
+            installing = False
+    
+            runtime_key = self.compute_handler.get_runtime_key(runtime_name, runtime_memory)
+            runtime_deployed = True
+            try:
+                runtime_meta = self.internal_storage.get_runtime_meta(runtime_key)
+            except Exception:
+                runtime_deployed = False
+    
+            if not runtime_deployed:
+                logger.debug('ExecutorID {} | JobID {} - Runtime {} with {}MB is not yet '
+                             'installed'.format(self.executor_id, job_id, runtime_name, runtime_memory))
+                if not self.log_active and not installing:
+                    installing = True
+                    print('(Installing...)')
+    
+                timeout = self.config['serverless']['runtime_timeout']
+                logger.debug('Creating runtime: {}, memory: {}MB'.format(runtime_name, runtime_memory))
+                runtime_meta = self.compute_handler.create_runtime(runtime_name, runtime_memory, timeout=timeout)
+                self.internal_storage.put_runtime_meta(runtime_key, runtime_meta)
+    
+            py_local_version = version_str(sys.version_info)
+            py_remote_version = runtime_meta['python_ver']
+    
+            if py_local_version != py_remote_version:
+                raise Exception(("The indicated runtime '{}' is running Python {} and it "
+                                 "is not compatible with the local Python version {}")
+                                .format(runtime_name, py_remote_version, py_local_version))
+    
+            if not self.log_active and runtime_deployed:
+                print()
 
         return runtime_meta
 
@@ -190,6 +191,10 @@ class ServerlessInvoker:
         """
         Method used to perform the actual invocation against the Compute Backend
         """
+        try:
+            runtime_memory = job.map_memory[int(call_id)]
+        except:
+            runtime_memory = job.runtime_memory
         payload = {'config': self.config,
                    'log_level': logging.getLevelName(logger.getEffectiveLevel()),
                    'func_key': job.func_key,
@@ -203,12 +208,12 @@ class ServerlessInvoker:
                    'host_submit_tstamp': time.time(),
                    'lithops_version': __version__,
                    'runtime_name': job.runtime_name,
-                   'runtime_memory': job.runtime_memory,
+                   'runtime_memory': runtime_memory,
                    'runtime_timeout': job.runtime_timeout}
 
         # do the invocation
         start = time.time()
-        activation_id = self.compute_handler.invoke(job.runtime_name, job.runtime_memory, payload)
+        activation_id = self.compute_handler.invoke(job.runtime_name, runtime_memory, payload)
         roundtrip = time.time() - start
         resp_time = format(round(roundtrip, 3), '.3f')
 
@@ -431,6 +436,8 @@ class StandaloneInvoker:
         self.runtime_name = self.compute_handler.runtime
 
     def select_runtime(self, job_id, runtime_memory):
+
+
         log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {}'
                    .format(self.executor_id, job_id, self.runtime_name))
         logger.info(log_msg)

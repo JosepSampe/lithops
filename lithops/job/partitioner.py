@@ -176,6 +176,7 @@ def _split_objects_from_keys(map_func_args_list, keys_dict, chunk_size, chunk_nu
     """
     if chunk_size or chunk_number:
         logger.info('Creating chunks from object keys...')
+
     partitions = []
     parts_per_object = []
 
@@ -191,33 +192,29 @@ def _split_objects_from_keys(map_func_args_list, keys_dict, chunk_size, chunk_nu
 
         if chunk_number:
             chunk_rest = obj_size % chunk_number
-            chunk_size = obj_size // chunk_number + chunk_rest
+            obj_chunk_size = obj_size // chunk_number + chunk_rest
 
-        if chunk_size and chunk_size < CHUNK_SIZE_MIN:
-            chunk_size = None
+        if chunk_size is None:
+            obj_chunk_size = obj_size
+        else:
+            obj_chunk_size = chunk_size
 
         total_partitions = 0
+        size = 0
 
-        if chunk_size is not None and obj_size > chunk_size:
-            size = 0
-            while size < obj_size:
-                brange = (size, size+chunk_size+CHUNK_THRESHOLD)
-                size += chunk_size
-                partition = entry.copy()
-                partition['obj'] = CloudObject(sb, bucket, key)
-                partition['obj'].data_byte_range = brange
-                partition['obj'].chunk_size = chunk_size
-                partition['obj'].part = total_partitions
-                partitions.append(partition)
-                total_partitions = total_partitions + 1
-        else:
-            partition = entry
+        while size < obj_size:
+            brange = (size, size+obj_chunk_size+CHUNK_THRESHOLD)
+            brange = None if obj_size == obj_chunk_size else brange
+
+            partition = entry.copy()
             partition['obj'] = CloudObject(sb, bucket, key)
-            partition['obj'].data_byte_range = None
-            partition['obj'].chunk_size = chunk_size
+            partition['obj'].data_byte_range = brange
+            partition['obj'].chunk_size = obj_chunk_size
             partition['obj'].part = total_partitions
             partitions.append(partition)
-            total_partitions = 1
+
+            total_partitions += 1
+            size += obj_chunk_size
 
         parts_per_object.append(total_partitions)
 
