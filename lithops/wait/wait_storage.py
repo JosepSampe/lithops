@@ -300,5 +300,5 @@ def _future_timeout_checker_thread(running_futures, internal_storage, throw_exce
             internal_storage.put_data(status_key, dmpd_response_status)
             if throw_except:
                 should_run = False
-        except Exception:
-            pass
+        except Exception as e:
+            time.sleep(5)

@@ -54,7 +54,12 @@ class ResponseFuture:
         self.function_name = job_description['function_name']
         self.execution_timeout = job_description['execution_timeout']
         self.runtime_name = job_description['runtime_name']
-        self.runtime_memory = job_description['runtime_memory']
+
+        if 'map_memory' in job_description:
+            self.runtime_memory = job_description['map_memory'][int(call_id)]
+        else:
+            self.runtime_memory = job_description['runtime_memory']
+
         self.activation_id = None
         self.stats = {}
 

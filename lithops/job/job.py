@@ -35,12 +35,13 @@ logger = logging.getLogger(__name__)
 def calculate_memory_per_invocation(map_iterdata):
     memory = []
 
-    available_mems = list(range(256, 2048+1, 64))
+    available_mems = list(range(256, 4096+1, 64))
 
     for obj in map_iterdata:
-        calc_mem = (obj['obj'].chunk_size / 1024**2)*64
-        final_mem = min(available_mems, key=lambda x:abs(x-calc_mem))
-        print(obj['obj'].key, calc_mem, final_mem)
+        calc_mem = int((obj['obj'].chunk_size / 1024**2)*64)
+        final_mem = min(available_mems, key=lambda x: abs(x-calc_mem))
+        print('{} - Obj Size: {} - Calculated mem: {} - Final mem: {}'
+              .format(obj['obj'].key, obj['obj'].chunk_size, calc_mem, final_mem))
         memory.append(final_mem)
 
     return memory
@@ -160,6 +161,8 @@ def _create_job(config, internal_storage, executor_id, job_id, func, data, runti
 
     if not data:
         return []
+
+    execution_timeout = execution_timeout or config['lithops']['execution_timeout']
 
     job_description = {}
     job_description['execution_timeout'] = execution_timeout

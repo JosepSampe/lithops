@@ -81,7 +81,7 @@ class ServerlessInvoker:
         file does not exists in the storage, this means that the runtime is not
         installed, so this method will proceed to install it.
         """
-        for runtime_memory in range(256, 2048+1, 64):
+        for runtime_memory in range(256, 4096+1, 64):
             runtime_name = self.config['serverless']['runtime']
             if runtime_memory is None:
                 runtime_memory = self.config['serverless']['runtime_memory']
@@ -224,8 +224,8 @@ class ServerlessInvoker:
             self.token_bucket_q.put('#')
             return
 
-        logger.info('ExecutorID {} | JobID {} - Function call {} done! ({}s) - Activation'
-                    ' ID: {}'.format(job.executor_id, job.job_id, call_id, resp_time, activation_id))
+        logger.info('ExecutorID {} | JobID {} - Function call {} done! ({}s) ({}MB) - Activation'
+                    ' ID: {}'.format(job.executor_id, job.job_id, call_id, resp_time, runtime_memory, activation_id))
 
         return call_id
 
@@ -262,6 +262,13 @@ class ServerlessInvoker:
         job_description['runtime_name'] = self.config['serverless']['runtime']
         job_description['runtime_memory'] = self.config['serverless']['runtime_memory']
         job_description['runtime_timeout'] = self.config['serverless']['runtime_timeout']
+
+        execution_timeout = job_description['execution_timeout']
+        print(execution_timeout)
+        runtime_timeout = self.config['serverless']['runtime_timeout']
+
+        if execution_timeout >= runtime_timeout:
+            job_description['execution_timeout'] = runtime_timeout - 5
 
         job = SimpleNamespace(**job_description)
 
@@ -396,7 +403,7 @@ class JobMonitor:
             total_callids_done_in_job = total_callids_done_in_job + total_new_tokens
             for i in range(total_new_tokens):
                 self.token_bucket_q.put('#')
-            time.sleep(0.3)
+            time.sleep(1)
 
     def _job_monitoring_rabbitmq(self, job):
         total_callids_done_in_job = 0
