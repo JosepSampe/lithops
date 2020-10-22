@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 def calculate_memory_per_invocation(map_iterdata):
     memory = []
-    
+
     available_mems = list(range(256, 2048+1, 64))
 
     for obj in map_iterdata:
