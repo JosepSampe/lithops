@@ -84,9 +84,7 @@ class ServerlessInvoker:
         runtime_name = self.config['serverless']['runtime']
         runtime_memory = runtime_memory or self.config['serverless']['runtime_memory']
 
-        runtime_mem = range(256, 4096+1, 64)
-
-        def deploy_runtime(runtime_memory):
+        for runtime_memory in range(256, 4096+1, 64):
             if runtime_memory:
                 runtime_memory = int(runtime_memory)
                 log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {} - {}MB'
@@ -130,12 +128,7 @@ class ServerlessInvoker:
             if not self.log_active and runtime_deployed:
                 print()
 
-            return runtime_meta
-
-        with ThreadPoolExecutor(max_workers=len(runtime_mem)) as ex:
-            results_iterator = ex.map(deploy_runtime, runtime_mem)
-
-        return next(results_iterator)
+        return runtime_meta
 
     def _start_invoker_process(self):
         """
