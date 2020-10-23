@@ -81,11 +81,12 @@ class ServerlessInvoker:
         file does not exists in the storage, this means that the runtime is not
         installed, so this method will proceed to install it.
         """
-        for runtime_memory in range(256, 4096+1, 64):
-            runtime_name = self.config['serverless']['runtime']
-            if runtime_memory is None:
-                runtime_memory = self.config['serverless']['runtime_memory']
-    
+        runtime_name = self.config['serverless']['runtime']
+        runtime_memory = runtime_memory or self.config['serverless']['runtime_memory']
+
+        runtime_mem = range(256, 4096+1, 64)
+
+        def deploy_runtime(runtime_memory):
             if runtime_memory:
                 runtime_memory = int(runtime_memory)
                 log_msg = ('ExecutorID {} | JobID {} - Selected Runtime: {} - {}MB'
@@ -96,40 +97,45 @@ class ServerlessInvoker:
             logger.info(log_msg)
             if not self.log_active:
                 print(log_msg, end=' ')
-    
+
             installing = False
-    
+
             runtime_key = self.compute_handler.get_runtime_key(runtime_name, runtime_memory)
             runtime_deployed = True
             try:
                 runtime_meta = self.internal_storage.get_runtime_meta(runtime_key)
             except Exception:
                 runtime_deployed = False
-    
+
             if not runtime_deployed:
                 logger.debug('ExecutorID {} | JobID {} - Runtime {} with {}MB is not yet '
                              'installed'.format(self.executor_id, job_id, runtime_name, runtime_memory))
                 if not self.log_active and not installing:
                     installing = True
                     print('(Installing...)')
-    
+
                 timeout = self.config['serverless']['runtime_timeout']
                 logger.debug('Creating runtime: {}, memory: {}MB'.format(runtime_name, runtime_memory))
                 runtime_meta = self.compute_handler.create_runtime(runtime_name, runtime_memory, timeout=timeout)
                 self.internal_storage.put_runtime_meta(runtime_key, runtime_meta)
-    
+
             py_local_version = version_str(sys.version_info)
             py_remote_version = runtime_meta['python_ver']
-    
+
             if py_local_version != py_remote_version:
                 raise Exception(("The indicated runtime '{}' is running Python {} and it "
                                  "is not compatible with the local Python version {}")
                                 .format(runtime_name, py_remote_version, py_local_version))
-    
+
             if not self.log_active and runtime_deployed:
                 print()
 
-        return runtime_meta
+            return runtime_meta
+
+        with ThreadPoolExecutor(max_workers=len(runtime_mem)) as ex:
+            results_iterator = ex.map(deploy_runtime, runtime_mem)
+
+        return next(results_iterator)
 
     def _start_invoker_process(self):
         """
