@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+import sys
 import os
 import glob
 import importlib
@@ -41,7 +41,7 @@ class SerializeIndependent:
         self.preinstalled_modules.append(['lithops', True])
         self._modulemgr = None
 
-    def __call__(self, list_of_objs, include_modules, exclude_modules):
+    def __call__(self, func, iterdata, include_modules, exclude_modules):
         """
         Serialize f, args, kwargs independently
         """
@@ -53,18 +53,26 @@ class SerializeIndependent:
 
         strs = []
         mods = []
-        for obj in list_of_objs:
+        for obj in [func]:
+            mods.extend(self._module_inspect(obj))
+
+        for obj in iterdata:
             mods.extend(self._module_inspect(obj))
             strs.append(cloudpickle.dumps(obj))
 
         # Add modules
         direct_modules = set()
         for module_name in mods:
-            if module_name == '__main__':
+            if module_name is None:
                 continue
-            origin = importlib.util.find_spec(module_name).origin
-            direct_modules.add(origin if origin != 'built-in' else module_name)
-            self._modulemgr.add(module_name)
+
+            if module_name == '__main__':
+                module = os.path.abspath(sys.modules['__main__'].__file__)
+                self._modulemgr.add(module)
+            else:
+                origin = importlib.util.find_spec(module_name).origin
+                direct_modules.add(origin if origin != 'built-in' else module_name)
+                self._modulemgr.add(module_name)
 
         logger.debug("Referenced modules: {}".format(None if not direct_modules
                                                      else ", ".join(direct_modules)))
@@ -165,13 +173,20 @@ class SerializeIndependent:
         return result
 
 
-def create_module_data(mod_paths):
+def create_module_data(mod_paths, include_modules):
 
     module_data = {}
     # load mod paths
+
+    if type(include_modules) != list:
+        include_modules = [include_modules]
+    for m in include_modules:
+        mod_paths.add(os.path.abspath(m))
+
     for m in mod_paths:
         if os.path.isdir(m):
             files = glob.glob(os.path.join(m, "**/*.py"), recursive=True)
+            files += glob.glob(os.path.join(m, "**/*.so"), recursive=True)
             pkg_root = os.path.abspath(os.path.dirname(m))
         else:
             pkg_root = os.path.abspath(os.path.dirname(m))

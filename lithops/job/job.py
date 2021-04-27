@@ -232,12 +232,14 @@ def _create_job(config, internal_storage, executor_id, job_id, func,
     logger.debug('ExecutorID {} | JobID {} - Serializing function and data'.format(executor_id, job_id))
     job_serialize_start = time.time()
     serializer = SerializeIndependent(runtime_meta['preinstalls'])
-    func_and_data_ser, mod_paths = serializer([func] + iterdata, inc_modules, exc_modules)
-    data_strs = func_and_data_ser[1:]
+    data_strs, mod_paths = serializer(func, iterdata, inc_modules, exc_modules)
+
     data_size_bytes = sum(len(x) for x in data_strs)
-    module_data = create_module_data(mod_paths)
-    func_str = func_and_data_ser[0]
-    func_module_str = pickle.dumps({'func': func_str, 'module_data': module_data}, -1)
+    module_data = create_module_data(mod_paths, include_modules)
+
+    func_mod_dict = {'func_name': func.__name__, 'func_file': func.__code__.co_filename, 'module_data': module_data}
+
+    func_module_str = pickle.dumps(func_mod_dict, -1)
     func_module_size_bytes = len(func_module_str)
     total_size = utils.sizeof_fmt(data_size_bytes+func_module_size_bytes)
     host_job_meta['host_job_serialize_time'] = round(time.time()-job_serialize_start, 6)

@@ -25,7 +25,9 @@ import inspect
 import requests
 import traceback
 import numpy as np
+from os import listdir
 from pydoc import locate
+from importlib import import_module
 from distutils.util import strtobool
 
 from lithops.storage import Storage
@@ -173,7 +175,14 @@ class JobRunner:
         result = None
         exception = False
         try:
-            function = pickle.loads(self.task.func)
+            try:
+                function = pickle.loads(self.task.func)
+            except:
+                func_file = self.task.func[0].strip('.py')
+                func_name = self.task.func[1]
+                mod = import_module(func_file)
+                function = getattr(mod, func_name)
+
             data = pickle.loads(self.task.data)
 
             if strtobool(os.environ.get('__LITHOPS_REDUCE_JOB', 'False')):

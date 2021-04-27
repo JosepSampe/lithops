@@ -44,12 +44,14 @@ def get_function_and_modules(job, internal_storage):
     customized_runtime = job.config[mode].get('customized_runtime', False)
 
     func_obj = None
+
     if customized_runtime:
         func_path = '/'.join([LITHOPS_TEMP_DIR, job.func_key])
         with open(func_path, "rb") as f:
             func_obj = f.read()
     else:
         func_obj = internal_storage.get_func(job.func_key)
+
     loaded_func_all = pickle.loads(func_obj)
 
     if loaded_func_all['module_data']:
@@ -59,11 +61,13 @@ def get_function_and_modules(job, internal_storage):
         sys.path.append(module_path)
 
         for m_filename, m_data in loaded_func_all['module_data'].items():
+
             m_path = os.path.dirname(m_filename)
 
             if len(m_path) > 0 and m_path[0] == "/":
                 m_path = m_path[1:]
             to_make = os.path.join(module_path, m_path)
+
             try:
                 os.makedirs(to_make)
             except OSError as e:
@@ -73,11 +77,14 @@ def get_function_and_modules(job, internal_storage):
                     raise e
             full_filename = os.path.join(to_make, os.path.basename(m_filename))
             # logger.debug('Writing {}'.format(full_filename))
-
+            print('Writing ', full_filename)
             with open(full_filename, 'wb') as fid:
                 fid.write(b64str_to_bytes(m_data))
 
-    return loaded_func_all['func']
+    if 'func' in loaded_func_all:
+        return loaded_func_all['func']
+    else:
+        return (loaded_func_all['func_file'], loaded_func_all['func_name'])
 
 
 def get_function_data(job, internal_storage):
