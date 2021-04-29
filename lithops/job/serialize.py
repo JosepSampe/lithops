@@ -48,6 +48,7 @@ class SerializeIndependent:
         self._modulemgr = ModuleDependencyAnalyzer()
         preinstalled_modules = [name for name, _ in self.preinstalled_modules]
         self._modulemgr.ignore(preinstalled_modules)
+        include_modules = []
         if not include_modules:
             self._modulemgr.ignore(exclude_modules)
 
