@@ -232,13 +232,19 @@ def _create_job(config, internal_storage, executor_id, job_id, func,
     logger.debug('ExecutorID {} | JobID {} - Serializing function and data'.format(executor_id, job_id))
     job_serialize_start = time.time()
     serializer = SerializeIndependent(runtime_meta['preinstalls'])
-    data_strs, mod_paths = serializer(func, iterdata, inc_modules, exc_modules)
-
-    data_size_bytes = sum(len(x) for x in data_strs)
+    pickable, (func_and_data_ser, mod_paths) = serializer(func, iterdata, inc_modules, exc_modules)
     module_data = create_module_data(mod_paths, include_modules)
 
-    func_mod_dict = {'func_name': func.__name__, 'func_file': func.__code__.co_filename, 'module_data': module_data}
+    if pickable:
+        func_str = func_and_data_ser[0]
+        data_strs = func_and_data_ser[1:]
+        func_mod_dict = {'func': func_str, 'module_data': module_data}
+    else:
+        data_strs = func_and_data_ser
+        module_data = create_module_data(mod_paths, include_modules)
+        func_mod_dict = {'func_name': func.__name__, 'func_file': func.__code__.co_filename, 'module_data': module_data}
 
+    data_size_bytes = sum(len(x) for x in data_strs)
     func_module_str = pickle.dumps(func_mod_dict, -1)
     func_module_size_bytes = len(func_module_str)
     total_size = utils.sizeof_fmt(data_size_bytes+func_module_size_bytes)

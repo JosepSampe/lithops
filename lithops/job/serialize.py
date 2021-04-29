@@ -53,8 +53,13 @@ class SerializeIndependent:
 
         strs = []
         mods = []
+        pickable = True
         for obj in [func]:
             mods.extend(self._module_inspect(obj))
+            try:
+                strs.append(cloudpickle.dumps(obj))
+            except Exception:
+                pickable = False
 
         for obj in iterdata:
             mods.extend(self._module_inspect(obj))
@@ -94,7 +99,7 @@ class SerializeIndependent:
         logger.debug("Modules to transmit: {}"
                      .format(None if not mod_paths else ", ".join(mod_paths)))
 
-        return (strs, mod_paths)
+        return pickable, (strs, mod_paths)
 
     def _module_inspect(self, obj):
         """
