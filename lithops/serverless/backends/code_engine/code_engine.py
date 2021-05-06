@@ -33,6 +33,7 @@ from lithops.utils import create_handler_zip
 from lithops.constants import COMPUTE_CLI_MSG, JOBS_PREFIX
 from . import config as ce_config
 from lithops.storage.utils import StorageNoSuchKeyError
+from lithops.util.ibm_token_manager import IBMTokenManager
 
 
 urllib3.disable_warnings()
@@ -54,6 +55,7 @@ class CodeEngineBackend:
 
         self.kubecfg_path = code_engine_config.get('kubecfg_path')
         self.user_agent = code_engine_config['user_agent']
+        self.iam_api_key = code_engine_config.get('iam_api_key', None)
 
         try:
             config.load_kube_config(config_file=self.kubecfg_path)
@@ -76,6 +78,18 @@ class CodeEngineBackend:
 
         self.capi = client.CustomObjectsApi()
         self.coreV1Api = client.CoreV1Api()
+
+        if self.iam_api_key:
+            token = self.code_engine_config.get('token', None)
+            token_expiry_time = self.code_engine_config.get('token_expiry_time', None)
+            self.ibm_token_manager = IBMTokenManager(self.iam_api_key,
+                                                     'IAM', token,
+                                                     token_expiry_time)
+            token, token_expiry_time = self.ibm_token_manager.get_token()
+            self.code_engine_config['token'] = token
+            self.code_engine_config['token_expiry_time'] = token_expiry_time
+            self.capi.api_client.configuration.api_key['authorization'] = 'Bearer ' + token
+            self.coreV1Api.api_client.configuration.api_key['authorization'] = 'Bearer ' + token
 
         try:
             self.region = self.cluster.split('//')[1].split('.')[1]
@@ -261,7 +275,6 @@ class CodeEngineBackend:
         for jobdef in jobdefs['items']:
             try:
                 if jobdef['metadata']['labels']['type'] == 'lithops-runtime':
-                    runtime_name = jobdef['metadata']['name']
                     container = jobdef['spec']['template']['containers'][0]
                     image_name = container['image']
                     memory = container['resources']['requests']['memory'].replace('Mi', '')
@@ -273,18 +286,29 @@ class CodeEngineBackend:
 
         return runtimes
 
-    def clear(self):
+    def clear(self, job_keys=None):
         """
         Clean all completed jobruns in the current executor
         """
-        for job_key in self.jobs:
-            jobrun_name = 'lithops-{}'.format(job_key.lower())
-            try:
-                self._job_run_cleanup(jobrun_name)
-                self._delete_config_map(jobrun_name)
-            except Exception as e:
-                logger.debug("Deleting a jobrun failed with: {}".format(e))
-        self.jobs = []
+        if job_keys:
+            for job_key in job_keys:
+                if job_key in self.jobs:
+                    jobrun_name = 'lithops-{}'.format(job_key.lower())
+                    try:
+                        self._job_run_cleanup(jobrun_name)
+                        self._delete_config_map(jobrun_name)
+                    except Exception as e:
+                        logger.debug("Deleting a jobrun failed with: {}".format(e))
+                    self.jobs.remove(job_key)
+        else:
+            for job_key in self.jobs:
+                jobrun_name = 'lithops-{}'.format(job_key.lower())
+                try:
+                    self._job_run_cleanup(jobrun_name)
+                    self._delete_config_map(jobrun_name)
+                except Exception as e:
+                    logger.debug("Deleting a jobrun failed with: {}".format(e))
+            self.jobs = []
 
     def invoke(self, docker_image_name, runtime_memory, job_payload):
         """
@@ -300,8 +324,6 @@ class CodeEngineBackend:
         total_calls = job_payload['total_calls']
         chunksize = job_payload['chunksize']
         array_size = total_calls // chunksize + (total_calls % chunksize > 0)
-
-        runtime_memory = job_payload['runtime_memory']
 
         jobdef_name = self._format_jobdef_name(docker_image_name, runtime_memory)
         logger.debug("Job definition id {}".format(jobdef_name))
@@ -324,8 +346,8 @@ class CodeEngineBackend:
         config_map = self._create_config_map(job_payload, activation_id)
         container['env'][1]['valueFrom']['configMapKeyRef']['name'] = config_map
 
-        container['resources']['requests']['memory'] = '{}Mi'.format(runtime_memory)
-        container['resources']['requests']['cpu'] = str(self.code_engine_config['cpu'])
+        container['resources']['requests']['memory'] = '{}G'.format(runtime_memory/1024)
+        container['resources']['requests']['cpu'] = str(self.code_engine_config['runtime_cpu'])
 
         # logger.debug("request - {}".format(jobrun_res)
 
@@ -360,8 +382,8 @@ class CodeEngineBackend:
         container['image'] = '/'.join([self.code_engine_config['container_registry'], image_name])
         container['name'] = jobdef_name
         container['env'][0]['value'] = 'run'
-        container['resources']['requests']['memory'] = '{}Mi'.format(runtime_memory)
-        container['resources']['requests']['cpu'] = str(self.code_engine_config['cpu'])
+        container['resources']['requests']['memory'] = '{}G'.format(runtime_memory/1024)
+        container['resources']['requests']['cpu'] = str(self.code_engine_config['runtime_cpu'])
 
         try:
             res = self.capi.delete_namespaced_custom_object(

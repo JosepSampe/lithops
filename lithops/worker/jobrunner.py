@@ -176,34 +176,37 @@ class JobRunner:
         exception = False
         try:
             try:
-                function = pickle.loads(self.task.func)
+                func = pickle.loads(self.task.func)
             except:
                 func_file = self.task.func[0].strip('.py')
                 func_name = self.task.func[1]
                 mod = import_module(func_file)
-                function = getattr(mod, func_name)
+                func = getattr(mod, func_name)
 
             data = pickle.loads(self.task.data)
 
             if strtobool(os.environ.get('__LITHOPS_REDUCE_JOB', 'False')):
                 self._wait_futures(data)
-            elif is_object_processing_function(function):
+            elif is_object_processing_function(func):
                 self._load_object(data)
 
-            self._fill_optional_args(function, data)
+            self._fill_optional_args(func, data)
+
+            fn_name = func.__name__ if inspect.isfunction(func) \
+                or inspect.ismethod(func) else type(func).__name__
 
             self.prometheus.send_metric(name='function_start',
                                         value=time.time(),
                                         labels=(
                                             ('job_id', self.task.job_id),
                                             ('call_id', self.task.id),
-                                            ('function_name', function.__name__)
+                                            ('function_name', fn_name)
                                         ))
 
-            logger.info("Going to execute '{}()'".format(str(function.__name__)))
+            logger.info("Going to execute '{}()'".format(str(fn_name)))
             print('---------------------- FUNCTION LOG ----------------------')
             function_start_tstamp = time.time()
-            result = function(**data)
+            result = func(**data)
             function_end_tstamp = time.time()
             print('----------------------------------------------------------')
             logger.info("Success function execution")
@@ -213,7 +216,7 @@ class JobRunner:
                                         labels=(
                                             ('job_id', self.task.job_id),
                                             ('call_id', self.task.id),
-                                            ('function_name', function.__name__)
+                                            ('function_name', fn_name)
                                         ))
 
             self.stats.write('worker_func_start_tstamp', function_start_tstamp)

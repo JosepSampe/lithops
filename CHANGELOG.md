@@ -1,6 +1,25 @@
 # Changelog
 
-## [v2.3.2.dev0]
+## [v2.3.4.dev0]
+
+### Added
+- [Core] Allow to execute a Class as lithops function
+- [CE] Allow to use IBM IAM API key
+
+### Changed
+- [CE] CPU and memory values must match predefined flavors
+
+### Fixes
+- [Core] Clear only present jobs instead of all after wait() or get_result()
+
+
+## [v2.3.3]
+
+### Fixes
+- [Core] Allow to execute class methods as lithops function
+
+
+## [v2.3.2]
 
 ### Added
 - [Core] New "warm_container" and "func_result_size" in future statistics
@@ -16,6 +35,7 @@
 
 ### Deleted
 - [Core] Removed cloudpickle from lithops.libs
+
 
 ## [v2.3.1]
 
