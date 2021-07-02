@@ -73,9 +73,11 @@ def master(encoded_payload):
 
     def callback(ch, method, properties, body):
         violation = json.loads(body.decode("utf-8"))
-        proxy.logger.info(violation)
-        #call_key = violation['Message']['key']
-        #proxy.logger.info(call_key)
+        try:
+            call_key = violation['Message']['key']
+            proxy.logger.info(call_key)
+        except Exception:
+            pass
 
     proxy.logger.info(f'Starting consuming from queue {queue} at {rabbit_amqp_url}')
     channel.basic_consume(queue, callback, auto_ack=True)
