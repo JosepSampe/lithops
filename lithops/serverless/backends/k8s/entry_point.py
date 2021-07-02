@@ -61,7 +61,7 @@ def get_id(jobkey, total_calls):
         call_id = '-1'
 
     remote_host = flask.request.remote_addr
-    proxy.logger.info('Sending ID {} to Host {}'.format(call_id, remote_host))
+    proxy.logger.info(f'Job Key: {jobkey} - Sending ID {call_id} to Host {remote_host}')
 
     return call_id
 
@@ -78,10 +78,13 @@ def master(encoded_payload):
     channel = connection.channel()
 
     def callback(ch, method, properties, body):
+        global JOB_INDEXES
+
         try:
             violation = json.loads(body.decode("utf-8"))
-            call_key = violation['Message'][0]['key']
-            proxy.logger.info(call_key)
+            logger.info(violation)
+            jobkey, call_id = violation['Message'][0]['key'].rsplit('-', 1)
+            JOB_INDEXES[jobkey].put(int(call_id))
         except Exception:
             pass
 
