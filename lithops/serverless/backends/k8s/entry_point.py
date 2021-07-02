@@ -24,6 +24,8 @@ import time
 import requests
 import pika
 import threading
+import queue
+import multiprocessing as mp
 from functools import partial
 
 from lithops.version import __version__
@@ -49,11 +51,15 @@ def get_id(jobkey, total_calls):
     global JOB_INDEXES
 
     if jobkey not in JOB_INDEXES:
-        JOB_INDEXES[jobkey] = 0
-    else:
-        JOB_INDEXES[jobkey] += 1
+        JOB_INDEXES[jobkey] = mp.Queue()
+        for call_id in range(total_calls):
+            JOB_INDEXES[jobkey].put(call_id)
 
-    call_id = '-1' if JOB_INDEXES[jobkey] >= int(total_calls) else str(JOB_INDEXES[jobkey])
+    try:
+        call_id = JOB_INDEXES[jobkey].get(timeout=0.1)
+    except queue.Empty:
+        call_id = -1
+
     remote_host = flask.request.remote_addr
     proxy.logger.info('Sending ID {} to Host {}'.format(call_id, remote_host))
 
