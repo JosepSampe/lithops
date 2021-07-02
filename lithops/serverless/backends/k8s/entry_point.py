@@ -61,6 +61,8 @@ def get_id(jobkey, total_calls):
 
 
 def master(encoded_payload):
+    proxy.logger.setLevel(logging.DEBUG)
+
     config = b64str_to_dict(encoded_payload)
 
     rabbit_amqp_url = config['rabbitmq'].get('amqp_url')
@@ -72,12 +74,12 @@ def master(encoded_payload):
     def callback(ch, method, properties, body):
         violation = json.loads(body.decode("utf-8"))
         call_key = violation['Message']['key']
-        logger.info(call_key)
+        proxy.logger.info(call_key)
 
+    proxy.logger.info(f'Starting consuming from queue {queue} at {rabbit_amqp_url}')
     channel.basic_consume(queue, callback, auto_ack=True)
     threading.Thread(target=channel.start_consuming, daemon=True).start()
 
-    proxy.logger.setLevel(logging.DEBUG)
     proxy.run(debug=True, host='0.0.0.0', port=MASTER_PORT)
 
 
