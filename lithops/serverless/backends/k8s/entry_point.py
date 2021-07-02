@@ -72,9 +72,9 @@ def master(encoded_payload):
     channel = connection.channel()
 
     def callback(ch, method, properties, body):
-        violation = json.loads(body.decode("utf-8"))
         try:
-            call_key = violation['Message']['key']
+            violation = json.loads(body.decode("utf-8"))
+            call_key = violation['Message'][0]['key']
             proxy.logger.info(call_key)
         except Exception:
             pass
@@ -130,10 +130,6 @@ def run_job(encoded_payload):
 
         if job_index == -1:
             time.sleep(1)
-            continue
-
-        if job_index == -2:
-            job_finished = True
             continue
 
         act_id = str(uuid.uuid4()).replace('-', '')[:12]
