@@ -22,6 +22,8 @@ import logging
 import flask
 import time
 import requests
+import pika
+import threading
 from functools import partial
 
 from lithops.version import __version__
@@ -58,7 +60,23 @@ def get_id(jobkey, total_calls):
     return call_id
 
 
-def master():
+def master(encoded_payload):
+    config = b64str_to_dict(encoded_payload)
+
+    rabbit_amqp_url = config['rabbitmq'].get('amqp_url')
+    queue = 'CloudButton'
+    pikaparams = pika.URLParameters(rabbit_amqp_url)
+    connection = pika.BlockingConnection(pikaparams)
+    channel = connection.channel()
+
+    def callback(ch, method, properties, body):
+        violation = json.loads(body.decode("utf-8"))
+        call_key = violation['Message']['key']
+        logger.info(call_key)
+
+    channel.basic_consume(queue, callback, auto_ack=True)
+    threading.Thread(target=channel.start_consuming, daemon=True).start()
+
     proxy.logger.setLevel(logging.DEBUG)
     proxy.run(debug=True, host='0.0.0.0', port=MASTER_PORT)
 
@@ -106,6 +124,10 @@ def run_job(encoded_payload):
                 time.sleep(0.1)
 
         if job_index == -1:
+            time.sleep(1)
+            continue
+
+        if job_index == -2:
             job_finished = True
             continue
 
@@ -130,7 +152,7 @@ if __name__ == '__main__':
     switcher = {
         'preinstalls': partial(extract_runtime_meta, encoded_payload),
         'run': partial(run_job, encoded_payload),
-        'master': master
+        'master': partial(master, encoded_payload)
 
     }
 

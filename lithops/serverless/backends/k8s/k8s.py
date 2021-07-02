@@ -287,7 +287,7 @@ class KubernetesBackend:
         logger.debug('Note that k8s job backend does not manage runtimes')
         return []
 
-    def _start_master(self, docker_image_name):
+    def _start_master(self, docker_image_name, job_payload):
 
         job_name = 'lithops-master'
 
@@ -313,6 +313,7 @@ class KubernetesBackend:
         container = job_res['spec']['template']['spec']['containers'][0]
         container['image'] = docker_image_name
         container['env'][0]['value'] = 'master'
+        container['env'][1]['value'] = dict_to_b64str(job_payload['config'])
 
         try:
             self.batch_api.create_namespaced_job(namespace=self.namespace,
@@ -331,7 +332,7 @@ class KubernetesBackend:
         Invoke -- return information about this invocation
         For array jobs only remote_invocator is allowed
         """
-        master_ip = self._start_master(docker_image_name)
+        master_ip = self._start_master(docker_image_name, job_payload)
 
         workers = job_payload['workers']
         executor_id = job_payload['executor_id']
