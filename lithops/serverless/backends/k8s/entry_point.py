@@ -56,9 +56,9 @@ def get_id(jobkey, total_calls):
             JOB_INDEXES[jobkey].put(call_id)
 
     try:
-        call_id = JOB_INDEXES[jobkey].get(timeout=0.1)
+        call_id = str(JOB_INDEXES[jobkey].get(timeout=0.1))
     except queue.Empty:
-        call_id = -1
+        call_id = '-1'
 
     remote_host = flask.request.remote_addr
     proxy.logger.info('Sending ID {} to Host {}'.format(call_id, remote_host))
