@@ -52,7 +52,7 @@ def get_id(jobkey, total_calls):
 
     if jobkey not in JOB_INDEXES:
         JOB_INDEXES[jobkey] = mp.Queue()
-        for call_id in range(total_calls):
+        for call_id in range(int(total_calls)):
             JOB_INDEXES[jobkey].put(call_id)
 
     try:
