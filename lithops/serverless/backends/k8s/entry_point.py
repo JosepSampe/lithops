@@ -82,10 +82,11 @@ def master(encoded_payload):
 
         try:
             violation = json.loads(body.decode("utf-8"))
-            logger.info(violation)
+            proxy.logger.info(violation)
             jobkey, call_id = violation['Message'][0]['key'].rsplit('-', 1)
             JOB_INDEXES[jobkey].put(int(call_id))
-        except Exception:
+        except Exception as e:
+            proxy.logger(e)
             pass
 
     proxy.logger.info(f'Starting consuming from queue {queue} at {rabbit_amqp_url}')
