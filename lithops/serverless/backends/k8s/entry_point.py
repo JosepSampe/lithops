@@ -86,6 +86,7 @@ def master(encoded_payload):
             jobkey, call_id = violation['Message'][0]['key'].rsplit('-', 1)
             JOB_INDEXES[jobkey].put(int(call_id))
         except Exception as e:
+            proxy.logger.error(JOB_INDEXES)
             proxy.logger.error(e)
             pass
 
