@@ -94,7 +94,7 @@ def master(encoded_payload):
     channel.basic_consume(queue, callback, auto_ack=True)
     threading.Thread(target=channel.start_consuming, daemon=True).start()
 
-    proxy.run(debug=True, host='0.0.0.0', port=MASTER_PORT)
+    proxy.run(debug=True, host='0.0.0.0', port=MASTER_PORT, use_reloader=False)
 
 
 def extract_runtime_meta(encoded_payload):
