@@ -4,13 +4,19 @@
 ## [v2.3.6.dev0]
 
 ### Added
-- 
+- [Storage] Added MinIO storage backend
+- [Core] Allow to pass function args as part of the invocation payload in FaaS backends
 
 ### Changed
 - [AWS Lambda] Use layer from Klayers API for pre-compiled Amazon Linux numpy binaries
 
 ### Fixes
 - [Localhost] Fixed error when processing localhost objects
+- [Localhost] Allow to create a localhost storage instance when a config file exists with a cloud configuration
+- [Core] Fixed an unusual inconsistency in configuration between 'backend' and 'mode' parameters
+- [Core] Fixed customized_runtime feature
+- [Core] Fixed get_result() execution after wait() when throw_except is set to False
+- [Core] Fixed internal executions
 
 
 ## [v2.3.5]

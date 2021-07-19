@@ -86,6 +86,7 @@ Storage Backends
 - [Aliyun Object Storage Service](storage/aliyun_oss.md)
 - [Infinispan](storage/infinispan.md)
 - [Ceph](storage/ceph.md)
+- [MinIO](storage/minio.md)
 - [Redis](storage/redis.md)
 - [OpenStack Swift](storage/swift.md)
 
@@ -181,7 +182,6 @@ fexec = lithops.FunctionExecutor(monitoring='rabbitmq')
 |lithops|log_format | "%(asctime)s [%(levelname)s] %(name)s -- %(message)s" |no | Logging format string |
 |lithops|log_stream | ext://sys.stderr |no | Logging stream. eg.: ext://sys.stderr,  ext://sys.stdout|
 |lithops|log_filename |  |no | Path to a file. log_filename has preference over log_stream. |
-
 
 
 ### Summary of configuration keys for Serverless

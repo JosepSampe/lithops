@@ -63,6 +63,7 @@ LITHOPS_TEMP_DIR = os.path.join(TEMP, 'lithops')
 JOBS_DIR = os.path.join(LITHOPS_TEMP_DIR, 'jobs')
 LOGS_DIR = os.path.join(LITHOPS_TEMP_DIR, 'logs')
 MODULES_DIR = os.path.join(LITHOPS_TEMP_DIR, 'modules')
+CUSTOM_RUNTIME_DIR = os.path.join(LITHOPS_TEMP_DIR, 'custom_runtime')
 
 RN_LOG_FILE = os.path.join(LITHOPS_TEMP_DIR, 'runner.log')
 FN_LOG_FILE = os.path.join(LITHOPS_TEMP_DIR, 'functions.log')
@@ -76,10 +77,33 @@ CONFIG_DIR = os.path.join(HOME_DIR, '.lithops')
 CACHE_DIR = os.path.join(CONFIG_DIR, 'cache')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'config')
 
-SERVERLESS_BACKENDS = ['ibm_cf', 'code_engine', 'knative', 'openwhisk',
-                       'aws_lambda', 'gcp_functions', 'cloudrun',
-                       'azure_functions', 'aliyun_fc', 'k8s']
-STANDALONE_BACKENDS = ['ibm_vpc', 'vm']
+SERVERLESS_BACKENDS = ['ibm_cf',
+                       'code_engine',
+                       'knative',
+                       'openwhisk',
+                       'aws_lambda',
+                       'gcp_functions',
+                       'cloudrun',
+                       'azure_functions',
+                       'aliyun_fc',
+                       'k8s']
+
+STANDALONE_BACKENDS = ['ibm_vpc',
+                       'vm']
+
+FAAS_BACKENDS = ['ibm_cf',
+                 'knative',
+                 'openwhisk',
+                 'aws_lambda',
+                 'gcp_functions',
+                 'cloudrun',
+                 'azure_functions',
+                 'aliyun_fc']
+
+BATCH_BACKENDS = ['ibm_vpc',
+                  'k8s',
+                  'code_engine'
+                  'vm']
 
 CHUNKSIZE_DEFAULT = 1
 WORKER_PROCESSES_DEFAULT = 1
