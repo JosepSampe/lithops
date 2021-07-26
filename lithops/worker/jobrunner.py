@@ -32,11 +32,11 @@ from distutils.util import strtobool
 from lithops.storage import Storage
 from lithops.wait import wait
 from lithops.future import ResponseFuture
-from lithops.utils import sizeof_fmt, is_object_processing_function, FuturesList
+from lithops.utils import sizeof_fmt, is_object_processing_function, FuturesList,\
+    verify_args
 from lithops.utils import WrappedStreamingBodyPartition
 from lithops.util.metrics import PrometheusExporter
 from lithops.storage.utils import create_output_key
-from lithops.constants import JOBS_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,7 @@ class JobRunner:
         self.internal_storage = internal_storage
         self.lithops_config = job.config
 
-        self.output_key = create_output_key(JOBS_PREFIX, self.job.executor_id,
-                                            self.job.job_id, self.job.id)
+        self.output_key = create_output_key(job.executor_id, job.job_id, job.call_id)
 
         # Setup stats class
         self.stats = JobStats(self.job.stats_file)
@@ -80,9 +79,10 @@ class JobRunner:
         """
         func_sig = inspect.signature(function)
 
-        for arg in data:
-            if isinstance(data[arg], ResponseFuture):
-                data[arg] = data[arg].result(internal_storage=self.internal_storage)
+        if len(data) == 1 and 'future' in data:
+            # Function chaining feature
+            out = [data.pop('future').result(internal_storage=self.internal_storage)]
+            data.update(verify_args(function, out, None)[0])
 
         if 'ibm_cos' in func_sig.parameters:
             if 'ibm_cos' in self.lithops_config:
@@ -107,7 +107,7 @@ class JobRunner:
                 raise Exception('Cannot create the rabbitmq client: missing configuration')
 
         if 'id' in func_sig.parameters:
-            data['id'] = int(self.job.id)
+            data['id'] = int(self.job.call_id)
 
     def _wait_futures(self, data):
         logger.info('Reduce function: waiting for map results')
@@ -209,7 +209,7 @@ class JobRunner:
                                         value=time.time(),
                                         labels=(
                                             ('job_id', '-'.join([self.job.executor_id, self.job.job_id])),
-                                            ('call_id', self.job.id),
+                                            ('call_id', self.job.call_id),
                                             ('function_name', fn_name)
                                         ))
 
@@ -225,7 +225,7 @@ class JobRunner:
                                         value=time.time(),
                                         labels=(
                                             ('job_id', '-'.join([self.job.executor_id, self.job.job_id])),
-                                            ('call_id', self.job.id),
+                                            ('call_id', self.job.call_id),
                                             ('function_name', fn_name)
                                         ))
 

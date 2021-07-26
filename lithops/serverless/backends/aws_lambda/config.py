@@ -45,7 +45,7 @@ RUNTIME_MEMORY_DEFAULT = 256  # Default memory: 256 MB
 RUNTIME_MEMORY_MAX = 10240  # Max. memory: 10240 MB
 
 MAX_CONCURRENT_WORKERS = 1000
-INVOKE_POOL_THREADS_DEFAULT = 500
+INVOKE_POOL_THREADS_DEFAULT = 64
 
 
 def load_config(config_data):
@@ -122,4 +122,4 @@ def load_config(config_data):
         raise Exception("All mount paths must start with '/mnt' on 'aws_lambda/efs/*/mount_path' section")
 
     # Put credential keys to 'aws_lambda' dict entry
-    config_data['aws_lambda'] = {**config_data['aws_lambda'], **config_data['aws']}
+    config_data['aws_lambda'].update(config_data['aws'])

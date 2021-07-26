@@ -116,30 +116,38 @@ class FunctionExecutor:
         self.total_jobs = 0
         self.last_call = None
 
-        if self.config['lithops']['mode'] == LOCALHOST:
+        self.backend = self.config['lithops']['backend']
+        self.mode = self.config['lithops']['mode']
+
+        if self.mode == LOCALHOST:
             localhost_config = extract_localhost_config(self.config)
             self.compute_handler = LocalhostHandler(localhost_config)
-        elif self.config['lithops']['mode'] == SERVERLESS:
+        elif self.mode == SERVERLESS:
             serverless_config = extract_serverless_config(self.config)
             self.compute_handler = ServerlessHandler(serverless_config, self.internal_storage)
-        elif self.config['lithops']['mode'] == STANDALONE:
+        elif self.mode == STANDALONE:
             standalone_config = extract_standalone_config(self.config)
             self.compute_handler = StandaloneHandler(standalone_config)
 
         # Create the monitoring system
         monitoring_backend = self.config['lithops']['monitoring'].lower()
-        monitoring_config = self.config.get(monitoring_backend)
-        self.job_monitor = JobMonitor(monitoring_backend, monitoring_config)
+        self.job_monitor = JobMonitor(
+            executor_id=self.executor_id,
+            internal_storage=self.internal_storage,
+            backend=monitoring_backend,
+            config=self.config.get(monitoring_backend)
+        )
 
-        # Create the invokder
-        self.invoker = create_invoker(self.config,
-                                      self.executor_id,
-                                      self.internal_storage,
-                                      self.compute_handler,
-                                      self.job_monitor)
+        # Create the invoker
+        self.invoker = create_invoker(
+            config=self.config,
+            executor_id=self.executor_id,
+            internal_storage=self.internal_storage,
+            compute_handler=self.compute_handler,
+            job_monitor=self.job_monitor
+        )
 
-        logger.info('Function executor for {} created with ID: {}'
-                    .format(self.config['lithops']['backend'], self.executor_id))
+        logger.debug(f'Function executor for {self.backend} created with ID: {self.executor_id}')
 
         self.log_path = None
 
@@ -200,7 +208,7 @@ class FunctionExecutor:
     def map(self, map_function, map_iterdata, chunksize=None, worker_processes=None,
             extra_args=None, extra_env=None, runtime_memory=None, chunk_size=None,
             chunk_n=None, obj_chunk_size=None, obj_chunk_number=None, timeout=None,
-            invoke_pool_threads=None, include_modules=[], exclude_modules=[]):
+            include_modules=[], exclude_modules=[]):
         """
         For running multiple function executions asynchronously
 
@@ -220,7 +228,6 @@ class FunctionExecutor:
         :param remote_invocation: Enable or disable remote_invocation mechanism
         :param timeout: Time that the functions have to complete their execution
                         before raising a timeout
-        :param invoke_pool_threads: Number of threads to use to invoke
         :param include_modules: Explicitly pickle these dependencies
         :param exclude_modules: Explicitly keep these modules from pickled
                                 dependencies
@@ -251,8 +258,7 @@ class FunctionExecutor:
                              chunk_size=chunk_size,
                              chunk_n=chunk_n,
                              obj_chunk_size=obj_chunk_size,
-                             obj_chunk_number=obj_chunk_number,
-                             invoke_pool_threads=invoke_pool_threads)
+                             obj_chunk_number=obj_chunk_number)
 
         futures = self.invoker.run_job(job)
         self.futures.extend(futures)
@@ -267,8 +273,8 @@ class FunctionExecutor:
                    worker_processes=None, extra_args=None, extra_env=None,
                    map_runtime_memory=None, obj_chunk_size=None, obj_chunk_number=None,
                    reduce_runtime_memory=None, chunk_size=None, chunk_n=None,
-                   timeout=None, invoke_pool_threads=None, reducer_one_per_object=False,
-                   reducer_wait_local=False, include_modules=[], exclude_modules=[]):
+                   timeout=None, reducer_one_per_object=False, reducer_wait_local=False,
+                   include_modules=[], exclude_modules=[]):
         """
         Map the map_function over the data and apply the reduce_function across all futures.
         This method is executed all within CF.
@@ -291,7 +297,6 @@ class FunctionExecutor:
         :param timeout: Time that the functions have to complete their execution before raising a timeout.
         :param reducer_one_per_object: Set one reducer per object after running the partitioner
         :param reducer_wait_local: Wait for results locally
-        :param invoke_pool_threads: Number of threads to use to invoke.
         :param include_modules: Explicitly pickle these dependencies.
         :param exclude_modules: Explicitly keep these modules from pickled dependencies.
 
@@ -320,8 +325,7 @@ class FunctionExecutor:
                                  obj_chunk_number=obj_chunk_number,
                                  include_modules=include_modules,
                                  exclude_modules=exclude_modules,
-                                 execution_timeout=timeout,
-                                 invoke_pool_threads=invoke_pool_threads)
+                                 execution_timeout=timeout)
 
         map_futures = self.invoker.run_job(map_job)
         self.futures.extend(map_futures)
@@ -399,8 +403,9 @@ class FunctionExecutor:
                  threadpool_size=threadpool_size,
                  wait_dur_sec=wait_dur_sec)
 
-        except Exception as e:
+        except (KeyboardInterrupt, Exception) as e:
             self.invoker.stop()
+            self.job_monitor.stop()
             if not fs and is_notebook():
                 del self.futures[len(self.futures) - len(futures):]
             if self.data_cleaner and not self.is_lithops_worker:
@@ -409,7 +414,6 @@ class FunctionExecutor:
 
         finally:
             present_jobs = {f.job_key for f in futures}
-            self.job_monitor.stop(present_jobs)
             if self.data_cleaner and not self.is_lithops_worker:
                 self.compute_handler.clear(present_jobs)
                 self.clean(clean_cloudobjects=False)
@@ -453,8 +457,7 @@ class FunctionExecutor:
                                        internal_storage=self.internal_storage))
                 f._read = True
 
-        logger.debug("ExecutorID {} Finished getting results"
-                     .format(self.executor_id))
+        logger.debug(f'ExecutorID {self.executor_id} - Finished getting results')
 
         if len(result) == 1 and self.last_call != 'map':
             return result[0]
@@ -477,14 +480,13 @@ class FunctionExecutor:
         ftrs_to_plot = [f for f in ftrs if (f.success or f.done) and not f.error]
 
         if not ftrs_to_plot:
-            logger.debug('ExecutorID {} - No futures ready to plot'
-                         .format(self.executor_id))
+            logger.debug(f'ExecutorID {self.executor_id} - No futures ready to plot')
             return
 
         logging.getLogger('matplotlib').setLevel(logging.WARNING)
         from lithops.plots import create_timeline, create_histogram
 
-        logger.info('ExecutorID {} - Creating execution plots'.format(self.executor_id))
+        logger.info(f'ExecutorID {self.executor_id} - Creating execution plots')
 
         create_timeline(ftrs_to_plot, dst)
         create_histogram(ftrs_to_plot, dst)
@@ -500,7 +502,6 @@ class FunctionExecutor:
         :param clean_cloudobjects: true/false
         :param spawn_cleaner true/false
         """
-
         os.makedirs(CLEANER_DIR, exist_ok=True)
 
         def save_data_to_clean(data):
@@ -508,8 +509,10 @@ class FunctionExecutor:
                 pickle.dump(data, temp)
 
         if cs:
-            data = {'cos_to_clean': list(cs),
-                    'storage_config': self.internal_storage.get_storage_config()}
+            data = {
+                'cos_to_clean': list(cs),
+                'storage_config': self.internal_storage.get_storage_config()
+            }
             save_data_to_clean(data)
             if not fs:
                 return
@@ -521,18 +524,18 @@ class FunctionExecutor:
         jobs_to_clean = present_jobs - self.cleaned_jobs
 
         if jobs_to_clean:
-            logger.info("ExecutorID {} - Cleaning temporary data"
-                        .format(self.executor_id))
-            data = {'jobs_to_clean': jobs_to_clean,
-                    'clean_cloudobjects': clean_cloudobjects,
-                    'storage_config': self.internal_storage.get_storage_config()}
+            logger.info(f'ExecutorID {self.executor_id} - Cleaning temporary data')
+            data = {
+                'jobs_to_clean': jobs_to_clean,
+                'clean_cloudobjects': clean_cloudobjects,
+                'storage_config': self.internal_storage.get_storage_config()
+            }
             save_data_to_clean(data)
             self.cleaned_jobs.update(jobs_to_clean)
 
         if (jobs_to_clean or cs) and spawn_cleaner:
-            log_file = open(CLEANER_LOG_FILE, 'a')
             cmdstr = [sys.executable, '-m', 'lithops.scripts.cleaner']
-            sp.Popen(' '.join(cmdstr), shell=True, stdout=log_file, stderr=log_file)
+            sp.Popen(' '.join(cmdstr), shell=True)
 
     def job_summary(self, cloud_objects_n=0):
         """

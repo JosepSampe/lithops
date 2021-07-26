@@ -18,14 +18,19 @@ Lithops with MinIO storage backend.
 ```yaml
     lithops:
         storage: minio
-        storage_bucket: <BUCKET_NAME>
 
     minio:
+        storage_bucket: <BUCKET_NAME>
         endpoint: <ENDPOINT_URL>
-        access_key: <ACCESS_KEY>
-        secret_key: <ACCESS_KEY>
+        access_key_id: <ACCESS_KEY>
+        secret_access_key: <SECRET_ACCESS_KEY>
 ```
 
-- `endpoint`: The host ip adress where you installed the MinIO server. Must start with http:// or https://
-- `access_key`, `secret_key`: Access Key and Secret key provided when you created the user
- 
+#### Summary of configuration keys for MinIO:
+
+|Group|Key|Default|Mandatory|Additional info|
+|---|---|---|---|---|
+|minio | storage_bucket | | yes | The name of a bucket that exists in you account. This will be used by Lithops for intermediate data. If set, this will overwrite the `storage_bucket` set in `lithops` section |
+|minio | endpoint | |yes | The host ip adress where you installed the Ceph server. Must start with http:// or https:// |
+|minio | access_key_id | |yes | Account user access key |
+|minio | secret_access_key | |yes | Account user secret access key |

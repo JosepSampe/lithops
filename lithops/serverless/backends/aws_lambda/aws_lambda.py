@@ -28,6 +28,10 @@ import botocore.exceptions
 import base64
 import requests
 
+from botocore.httpsession import URLLib3Session
+from botocore.awsrequest import AWSRequest
+from botocore.auth import SigV4Auth
+
 from lithops.constants import TEMP as TEMP_PATH
 from lithops.constants import COMPUTE_CLI_MSG
 from . import config as lambda_config
@@ -63,6 +67,8 @@ class AWSLambdaBackend:
         self.name = 'aws_lambda'
         self.type = 'faas'
         self.aws_lambda_config = aws_lambda_config
+        self.internal_storage = internal_storage
+        self.user_agent = aws_lambda_config['user_agent']
 
         self.user_key = aws_lambda_config['access_key_id'][-4:]
         self.package = 'lithops_v{}_{}'.format(lithops.__version__, self.user_key)
@@ -70,12 +76,23 @@ class AWSLambdaBackend:
         self.role_arn = aws_lambda_config['execution_role']
 
         logger.debug('Creating Boto3 AWS Session and Lambda Client')
-        self.aws_session = boto3.Session(aws_access_key_id=aws_lambda_config['access_key_id'],
-                                         aws_secret_access_key=aws_lambda_config['secret_access_key'],
-                                         region_name=self.region_name)
-        self.lambda_client = self.aws_session.client('lambda', region_name=self.region_name)
 
-        self.internal_storage = internal_storage
+        self.aws_session = boto3.Session(
+            aws_access_key_id=aws_lambda_config['access_key_id'],
+            aws_secret_access_key=aws_lambda_config['secret_access_key'],
+            region_name=self.region_name
+        )
+
+        self.lambda_client = self.aws_session.client(
+            'lambda', region_name=self.region_name,
+            config=botocore.client.Config(
+                       user_agent_extra=self.user_agent
+                   )
+        )
+
+        self.credentials = self.aws_session.get_credentials()
+        self.session = URLLib3Session()
+        self.host = f'lambda.{self.region_name}.amazonaws.com'
 
         if self.aws_lambda_config['account_id']:
             self.account_id = self.aws_lambda_config['account_id']
@@ -527,24 +544,50 @@ class AWSLambdaBackend:
         @param payload: invoke dict payload
         @return: invocation ID
         """
+
         function_name = self._format_function_name(runtime_name, runtime_memory)
 
-        response = self.lambda_client.invoke(
-            FunctionName=function_name,
-            InvocationType='Event',
-            Payload=json.dumps(payload)
-        )
+        headers = {'Host': self.host, 'X-Amz-Invocation-Type': 'Event', 'User-Agent': self.user_agent}
+        url = f'https://{self.host}/2015-03-31/functions/{function_name}/invocations'
+        request = AWSRequest(method="POST", url=url, data=json.dumps(payload, default=str), headers=headers)
+        SigV4Auth(self.credentials, "lambda", self.region_name).add_auth(request)
 
-        if response['ResponseMetadata']['HTTPStatusCode'] == 202:
-            return response['ResponseMetadata']['RequestId']
+        invoked = False
+        while not invoked:
+            try:
+                r = self.session.send(request.prepare())
+                invoked = True
+            except Exception:
+                pass
+
+        if r.status_code == 202:
+            return r.headers['x-amzn-RequestId']
+        elif r.status_code == 401:
+            logger.debug(r.text)
+            raise Exception('Unauthorized - Invalid API Key')
+        elif r.status_code == 404:
+            logger.debug(r.text)
+            raise Exception('Lithops Runtime: {} not deployed'.format(runtime_name))
         else:
-            logger.debug(response)
-            if response['ResponseMetadata']['HTTPStatusCode'] == 401:
-                raise Exception('Unauthorized - Invalid API Key')
-            elif response['ResponseMetadata']['HTTPStatusCode'] == 404:
-                raise Exception('Lithops Runtime: {} not deployed'.format(runtime_name))
-            else:
-                raise Exception(response)
+            logger.debug(r.text)
+            raise Exception('Error {}: {}'.format(r.status_code, r.text))
+
+        # response = self.lambda_client.invoke(
+        #    FunctionName=function_name,
+        #     InvocationType='Event',
+        #     Payload=json.dumps(payload, default=str)
+        #  )
+
+        # if response['ResponseMetadata']['HTTPStatusCode'] == 202:
+        #     return response['ResponseMetadata']['RequestId']
+        # else:
+        #     logger.debug(response)
+        #     if response['ResponseMetadata']['HTTPStatusCode'] == 401:
+        #         raise Exception('Unauthorized - Invalid API Key')
+        #     elif response['ResponseMetadata']['HTTPStatusCode'] == 404:
+        #         raise Exception('Lithops Runtime: {} not deployed'.format(runtime_name))
+        #     else:
+        #         raise Exception(response)
 
     def get_runtime_key(self, runtime_name, runtime_memory):
         """
