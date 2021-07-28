@@ -23,14 +23,13 @@ import shutil
 
 import lithops
 from lithops import Storage
-from lithops.scripts.tests import print_help, run_tests
+from lithops.tests.tests_main import print_test_functions, print_test_groups, run_tests
 from lithops.utils import get_mode, setup_lithops_logger, verify_runtime_name, sizeof_fmt
 from lithops.config import default_config, extract_storage_config, \
     extract_serverless_config, extract_standalone_config, \
     extract_localhost_config, load_yaml_config
 from lithops.constants import CACHE_DIR, LITHOPS_TEMP_DIR, RUNTIMES_PREFIX, \
-    JOBS_PREFIX, LOCALHOST, LOGS_DIR, FN_LOG_FILE, SERVERLESS_BACKENDS, \
-    STANDALONE_BACKENDS
+    JOBS_PREFIX, LOCALHOST, SERVERLESS, STANDALONE, LOGS_DIR, FN_LOG_FILE
 from lithops.storage import InternalStorage
 from lithops.serverless import ServerlessHandler
 from lithops.storage.utils import clean_bucket
@@ -75,14 +74,15 @@ def clean(config, backend, storage, debug):
     storage_config = extract_storage_config(config)
     internal_storage = InternalStorage(storage_config)
 
-    backend = config['lithops']['backend']
-    if backend == LOCALHOST:
+    mode = config['lithops']['mode']
+
+    if mode == LOCALHOST:
         compute_config = extract_localhost_config(config)
         compute_handler = LocalhostHandler(compute_config)
-    elif backend in SERVERLESS_BACKENDS:
+    elif mode == SERVERLESS:
         compute_config = extract_serverless_config(config)
         compute_handler = ServerlessHandler(compute_config, internal_storage)
-    elif backend == STANDALONE_BACKENDS:
+    elif mode == STANDALONE:
         compute_config = extract_standalone_config(config)
         compute_handler = StandaloneHandler(compute_config)
 
@@ -97,6 +97,39 @@ def clean(config, backend, storage, debug):
     shutil.rmtree(LITHOPS_TEMP_DIR, ignore_errors=True)
     # Clean local lithops cache
     shutil.rmtree(CACHE_DIR, ignore_errors=True)
+
+
+@lithops_cli.command('verify')
+@click.option('--test', '-t', default='all', help='Run a specific tester. To avoid running similarly named tests '
+                                                  'you may prefix the tester with its test class, '
+                                                  'e.g. TestClass.test_name. '
+                                                  'Type "-t help" for the complete tests list')
+@click.option('--config', '-c', default=None, help='Path to yaml config file', type=click.Path(exists=True))
+@click.option('--backend', '-b', default=None, help='Compute backend')
+@click.option('--groups', '-g', default=None, help='Run all testers belonging to a specific group.'
+                                                   ' type "-g help" for groups list')
+@click.option('--storage', '-s', default=None, help='Storage backend')
+@click.option('--debug', '-d', is_flag=True, help='Debug mode')
+@click.option('--fail_fast', '-f', is_flag=True, help='Stops test run upon first occurrence of a failed test')
+@click.option('--keep_datasets', '-k', is_flag=True, help='keeps datasets in storage after the test run. '
+                                                          'Meant to serve some use-cases in github workflow.')
+def test(test, config, backend, groups, storage, debug, fail_fast, keep_datasets):
+    if config:
+        config = load_yaml_config(config)
+
+    log_level = logging.INFO if not debug else logging.DEBUG
+    setup_lithops_logger(log_level)
+
+    if groups and test == 'all':  # if user specified a group(s) avoid running all tests.
+        test = ''
+
+    if test == 'help':
+        print_test_functions()
+    elif groups == 'help':
+        print_test_groups()
+
+    else:
+        run_tests(test, config, groups, backend, storage, fail_fast, keep_datasets)
 
 
 @lithops_cli.command('test')
@@ -129,25 +162,6 @@ def test_function(config, backend, storage, debug):
     else:
         print(result, 'Something went wrong :(')
     print()
-
-
-@lithops_cli.command('verify')
-@click.option('--test', '-t', default='all', help='run a specific test, type "-t help" for tests list')
-@click.option('--config', '-c', default=None, help='path to yaml config file', type=click.Path(exists=True))
-@click.option('--backend', '-b', default=None, help='compute backend')
-@click.option('--storage', '-s', default=None, help='storage backend')
-@click.option('--debug', '-d', is_flag=True, help='debug mode')
-def verify(test, config, backend, storage, debug):
-    if config:
-        config = load_yaml_config(config)
-
-    log_level = logging.INFO if not debug else logging.DEBUG
-    setup_lithops_logger(log_level)
-
-    if test == 'help':
-        print_help()
-    else:
-        run_tests(test, config, backend, storage)
 
 
 # /---------------------------------------------------------------------------/
