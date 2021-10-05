@@ -1,12 +1,6 @@
-# Choose your compute and storage backend
+# Lithops configuration
 
-To work with Lithops you must configure both compute backend and a storage. Failing to configure them properly will prevent Lithops to submit workloads.
-
-Lithops can work with almost any compute backend and storage any can be used with almost any cloud provider. You have multiple options to choose compute backend and storage backend based on your needs. 
-
-After you choose your compute and storage engine, you need to configure Lithops so it can use chosen compute and storage. Lithops configuration can be provided either in configuration file or provided in runtime via Python dictionary. 
-
-## Lithops configuration
+By default Lithops works on Localhost if no configuration is provided. To run workloads on the Cloud, you must configure both a compute and a storage backend. Failing to configure them properly will prevent Lithops to submit workloads. Lithops configuration can be provided either in a configuration file or in runtime via a Python dictionary. 
 
 ### Configuration file
 
@@ -25,7 +19,7 @@ To configure Lithops through a [configuration file](config_template.yaml) you ha
 An alternative mode of configuration is to use a python dictionary. This option allows to pass all the configuration details as part of the Lithops invocation in runtime. An entire list of sections and keys is [here](config_template.yaml)
 
 ## Compute and Storage backends
-Choose your compute and storage engine from the table below
+Choose your compute and storage engines from the table below
 
 
 <table>
@@ -58,7 +52,7 @@ Storage Backends
 <tr>
 <td>
 
-- [Localhost](../docs/mode_localhost.md)
+- [Localhost](compute/localhost.md)
 - [Remote Virtual Machine](compute/vm.md)
 - [IBM Virtual Private Cloud](compute/ibm_vpc.md)
 
@@ -74,7 +68,7 @@ Storage Backends
 - [Google Cloud Functions](compute/gcp_functions.md)
 - [Google Cloud Run](compute/gcp_cloudrun.md)
 - [Azure Functions](compute/azure_functions.md)
-- [Aliyun functions](compute/aliyun_fc.md)
+- [Aliyun functions](compute/aliyun_functions.md)
 
 </td>
 <td>
@@ -169,12 +163,10 @@ fexec = lithops.FunctionExecutor(monitoring='rabbitmq')
 
 |Group|Key|Default|Mandatory|Additional info|
 |---|---|---|---|---|
-|lithops | backend | ibm_cf | no | Compute backend implementation. IBM Cloud Functions is the default. If not set, Lithops will check the `mode` and use the `backend` set under the `serverless` or `standalone` sections described below |
+|lithops | backend | ibm_cf | no | Compute backend implementation. IBM Cloud Functions is the default |
 |lithops | storage | ibm_cos | no | Storage backend implementation. IBM Cloud Object Storage is the default |
-|lithops | mode | serverless | no | Execution mode. One of: **localhost**, **serverless** or **standalone**. `backend` has priority over `mode`, i.e., `mode` is automatically inferred from `backend`, so you can avoid setting it. Alternatively, you can set `mode` here and then set the `backend` under the `serverless` or `standalone` sections described below |
 |lithops | data_cleaner | True | no |If set to True, then the cleaner will automatically delete all the temporary data that was written into `storage_bucket/lithops.jobs`|
 |lithops | monitoring | storage | no | Monitoring system implementation. One of: **storage** or **rabbitmq** |
-|lithops | workers | Depends on the compute backend | no | Max number of concurrent workers |
 |lithops | data_limit | 4 | no | Max (iter)data size (in MB). Set to False for unlimited size |
 |lithops | execution_timeout | 1800 | no | Functions will be automatically killed if they exceed this execution time (in seconds). Alternatively, it can be set in the `call_async()`, `map()` or `map_reduce()` calls using the `timeout` parameter.|
 |lithops | include_modules | [] | no | Explicitly pickle these dependencies. All required dependencies are pickled if default empty list. No one dependency is pickled if it is explicitly set to None |
@@ -183,15 +175,8 @@ fexec = lithops.FunctionExecutor(monitoring='rabbitmq')
 |lithops | log_format | "%(asctime)s [%(levelname)s] %(name)s -- %(message)s" |no | Logging format string |
 |lithops | log_stream | ext://sys.stderr |no | Logging stream. eg.: ext://sys.stderr,  ext://sys.stdout|
 |lithops | log_filename |  |no | Path to a file. log_filename has preference over log_stream. |
+|lithops | customized_runtime | False | no | Enables to build a new runtime with the map() function and its dependencies integrated. Only docker-based backends support this feature. |
 
-
-### Summary of configuration keys for Serverless
-
-|Group|Key|Default|Mandatory|Additional info|
-|---|---|---|---|---|
-|serverless | backend | ibm_cf |no | Serverless compute backend implementation. IBM Cloud Functions is the default. If set it will overwrite the `backend` set in lithops section |
-|serverless | remote_invoker | False | no |  Activate the remote invoker feature that uses one cloud function to spawn all the actual `map()` activations |
-|serverless | customized_runtime | False | no | Enables early preparation of Lithops workers with the map function and custom Lithops runtime already deployed, and ready to be used in consequent computations |
 
 ### Summary of configuration keys for Standalone
 
@@ -202,5 +187,5 @@ fexec = lithops.FunctionExecutor(monitoring='rabbitmq')
 |standalone | auto_dismantle | True |no | If False then the VM is not stopped automatically. Run **exec.dismantle()** explicitly to stop the VM. |
 |standalone | soft_dismantle_timeout | 300 |no| Time in seconds to stop the VM instance after a job **completed** its execution |
 |standalone | hard_dismantle_timeout | 3600 | no | Time in seconds to stop the VM instance after a job **started** its execution |
-|standalone | exec_mode | consume | no | One of: **consume** or **create**. If set to  **create**, Lithops will automatically create VMs based on the number of elements in iterdata |
+|standalone | exec_mode | consume | no | One of: **consume**, **create** or **reuse**. If set to  **create**, Lithops will automatically create VMs based on the number of elements in iterdata. If set to **reuse** will try to reuse running workers if exist |
 |standalone | pull_runtime | False | no | If set to True, Lithops will execute the command `docker pull <runtime_name>` in each VSI before executing the a job|

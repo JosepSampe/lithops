@@ -25,9 +25,13 @@ import logging
 import inspect
 import requests
 import traceback
-import numpy as np
 from pydoc import locate
 from distutils.util import strtobool
+
+try:
+    import numpy as np
+except ModuleNotFoundError:
+    pass
 
 from lithops.storage import Storage
 from lithops.wait import wait
@@ -191,6 +195,8 @@ class JobRunner:
         logger.debug("Process started")
         result = None
         exception = False
+        fn_name = None
+
         try:
             func = pickle.loads(self.job.func)
             data = pickle.loads(self.job.data)
@@ -212,7 +218,7 @@ class JobRunner:
                 labels=(
                     ('job_id', self.job.job_key),
                     ('call_id', '-'.join([self.job.job_key, self.job.call_id])),
-                    ('function_name', fn_name)
+                    ('function_name', fn_name or 'undefined')
                 )
             )
 
@@ -284,7 +290,7 @@ class JobRunner:
                 labels=(
                     ('job_id', self.job.job_key),
                     ('call_id', '-'.join([self.job.job_key, self.job.call_id])),
-                    ('function_name', fn_name)
+                    ('function_name', fn_name or 'undefined')
                 )
             )
 
