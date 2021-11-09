@@ -108,7 +108,7 @@ def master(encoded_payload):
             proxy.logger.info(violation)
             key = violation['Message'][0]['key']
             violation_time = violation['Fields']['ViolationTime']
-            if key in VIOLATIONS and VIOLATIONS[key] != violation_time:
+            if key not in VIOLATIONS or VIOLATIONS[key] != violation_time:
                 VIOLATIONS[key] = violation_time
                 jobkey, call_id = key.rsplit('-', 1)
                 JOB_INDEXES[jobkey].put(int(call_id))
