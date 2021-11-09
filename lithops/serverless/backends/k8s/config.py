@@ -77,7 +77,6 @@ metadata:
   labels:
     type: lithops-runtime
 spec:
-  activeDeadlineSeconds: 1200
   ttlSecondsAfterFinished: 60
   parallelism: 1
   backoffLimit: 0

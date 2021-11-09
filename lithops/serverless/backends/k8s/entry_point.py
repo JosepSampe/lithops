@@ -44,11 +44,25 @@ proxy = flask.Flask(__name__)
 MASTER_PORT = 8080
 
 JOB_INDEXES = {}
+JOBS_DONE = {}
+
+
+@proxy.route('/setdone/<jobkey>/<jobindex>', methods=['POST'])
+def set_done(jobkey, jobindex):
+    global JOBS_DONE
+
+    if jobkey not in JOBS_DONE:
+        JOBS_DONE[jobkey] = []
+
+    JOBS_DONE[jobkey].append(jobindex)
+
+    proxy.logger.info(f'Job Key: {jobkey} - JOB INDEX {jobindex} Set done')
 
 
 @proxy.route('/getid/<jobkey>/<total_calls>', methods=['GET'])
 def get_id(jobkey, total_calls):
     global JOB_INDEXES
+    global JOBS_DONE
 
     if jobkey not in JOB_INDEXES:
         JOB_INDEXES[jobkey] = mp.Queue()
@@ -58,7 +72,10 @@ def get_id(jobkey, total_calls):
     try:
         call_id = str(JOB_INDEXES[jobkey].get(timeout=0.1))
     except queue.Empty:
-        call_id = '-1'
+        if jobkey in JOBS_DONE and len(JOBS_DONE[jobkey]) == int(total_calls):
+            call_id = '-2'
+        else:
+            call_id = '-1'
 
     remote_host = flask.request.remote_addr
     proxy.logger.info(f'Job Key: {jobkey} - Sending ID {call_id} to Host {remote_host}')
@@ -72,7 +89,7 @@ def master(encoded_payload):
     config = b64str_to_dict(encoded_payload)
 
     rabbit_amqp_url = config['rabbitmq'].get('amqp_url')
-    queue = 'CloudButton'
+    queue = config['rabbitmq'].get('queue', 'CloudButton')
     pikaparams = pika.URLParameters(rabbit_amqp_url)
     connection = pika.BlockingConnection(pikaparams)
     channel = connection.channel()
@@ -140,8 +157,14 @@ def run_job(encoded_payload):
                 time.sleep(0.1)
 
         if job_index == -1:
+            # No Indexes but job not finished
             time.sleep(1)
             continue
+
+        if job_index == -2:
+            # Job finished
+            job_finished = True
+            break
 
         act_id = str(uuid.uuid4()).replace('-', '')[:12]
         os.environ['__LITHOPS_ACTIVATION_ID'] = act_id
@@ -155,6 +178,18 @@ def run_job(encoded_payload):
         payload['data_byte_ranges'] = dbr
 
         function_handler(payload)
+
+        set_done = False
+        while not set_done:
+            try:
+                url = f'http://{master_ip}:{MASTER_PORT}/set_done/{job_key}/{job_index}'
+                res = requests.post(url)
+                logger.info(res.status_code)
+                set_done = True if res.status_code == 200 else False
+            except Exception:
+                time.sleep(0.1)
+
+    logger.info(f'Job {job_key} finished, stopping container')
 
 
 if __name__ == '__main__':
