@@ -45,6 +45,7 @@ MASTER_PORT = 8080
 
 JOB_INDEXES = {}
 JOBS_DONE = {}
+VIOLATIONS = {}
 
 
 @proxy.route('/setdone/<jobkey>/<jobindex>', methods=['POST'])
@@ -57,6 +58,9 @@ def set_done(jobkey, jobindex):
     JOBS_DONE[jobkey].append(jobindex)
 
     proxy.logger.info(f'Job Key: {jobkey} - JOB INDEX {jobindex} Set done')
+
+    status_code = flask.Response(status=200)
+    return status_code
 
 
 @proxy.route('/getid/<jobkey>/<total_calls>', methods=['GET'])
@@ -84,6 +88,8 @@ def get_id(jobkey, total_calls):
 
 
 def master(encoded_payload):
+    global VIOLATIONS
+
     proxy.logger.setLevel(logging.DEBUG)
 
     config = b64str_to_dict(encoded_payload)
@@ -100,8 +106,14 @@ def master(encoded_payload):
         try:
             violation = json.loads(body.decode("utf-8"))
             proxy.logger.info(violation)
-            jobkey, call_id = violation['Message'][0]['key'].rsplit('-', 1)
-            JOB_INDEXES[jobkey].put(int(call_id))
+            key = violation['Message'][0]['key']
+            violation_time = violation['Fields']['ViolationTime']
+            if key in VIOLATIONS and VIOLATIONS[key] != violation_time:
+                VIOLATIONS[key] = violation_time
+                jobkey, call_id = key.rsplit('-', 1)
+                JOB_INDEXES[jobkey].put(int(call_id))
+            else:
+                proxy.logger(f'Ignoring violation {key}. Already processed')
         except Exception as e:
             proxy.logger.error(JOB_INDEXES)
             proxy.logger.error(e)
@@ -182,7 +194,7 @@ def run_job(encoded_payload):
         set_done = False
         while not set_done:
             try:
-                url = f'http://{master_ip}:{MASTER_PORT}/set_done/{job_key}/{job_index}'
+                url = f'http://{master_ip}:{MASTER_PORT}/setdone/{job_key}/{job_index}'
                 res = requests.post(url)
                 logger.info(res.status_code)
                 set_done = True if res.status_code == 200 else False
