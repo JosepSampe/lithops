@@ -24,9 +24,9 @@ import time
 import requests
 import pika
 import threading
-import queue
 import multiprocessing as mp
 from functools import partial
+from gevent.pywsgi import WSGIServer
 
 from lithops.version import __version__
 from lithops.utils import setup_lithops_logger, b64str_to_dict,\
@@ -43,21 +43,24 @@ proxy = flask.Flask(__name__)
 
 MASTER_PORT = 8080
 
-JOB_INDEXES = {}
-JOBS_DONE = {}
-VIOLATIONS = {}
+mp_manager = mp.Manager()
+JOB_INDEXES = mp_manager.dict()
+JOBS_DONE = mp_manager.dict()
+VIOLATIONS = mp_manager.dict()
 
 
 @proxy.route('/setdone/<jobkey>/<jobindex>', methods=['POST'])
 def set_done(jobkey, jobindex):
     global JOBS_DONE
 
-    if jobkey not in JOBS_DONE:
-        JOBS_DONE[jobkey] = []
-
-    JOBS_DONE[jobkey].append(jobindex)
-
-    proxy.logger.info(f'Job Key: {jobkey} - JOB INDEX {jobindex} Set done')
+    try:
+        if jobkey in JOBS_DONE and jobindex not in JOBS_DONE[jobkey]:
+            JOBS_DONE[jobkey].append(jobindex)
+            proxy.logger.info(f'Job Key: {jobkey} - JOB INDEX {jobindex} Set done')
+        proxy.logger.info(f'Done indexes in {jobkey}: ' + str(list(JOBS_DONE[jobkey])))
+    except Exception as e:
+        proxy.logger.error(e)
+        pass
 
     status_code = flask.Response(status=200)
     return status_code
@@ -69,13 +72,15 @@ def get_id(jobkey, total_calls):
     global JOBS_DONE
 
     if jobkey not in JOB_INDEXES:
-        JOB_INDEXES[jobkey] = mp.Queue()
+        proxy.logger.info(f'Creating {jobkey} job queue')
+        JOB_INDEXES[jobkey] = mp_manager.list()
+        JOBS_DONE[jobkey] = mp_manager.list()
         for call_id in range(int(total_calls)):
-            JOB_INDEXES[jobkey].put(call_id)
+            JOB_INDEXES[jobkey].append(call_id)
 
     try:
-        call_id = str(JOB_INDEXES[jobkey].get(timeout=0.1))
-    except queue.Empty:
+        call_id = str(JOB_INDEXES[jobkey].pop())
+    except Exception:
         if jobkey in JOBS_DONE and len(JOBS_DONE[jobkey]) == int(total_calls):
             call_id = '-2'
         else:
@@ -88,8 +93,6 @@ def get_id(jobkey, total_calls):
 
 
 def master(encoded_payload):
-    global VIOLATIONS
-
     proxy.logger.setLevel(logging.DEBUG)
 
     config = b64str_to_dict(encoded_payload)
@@ -101,6 +104,7 @@ def master(encoded_payload):
     channel = connection.channel()
 
     def callback(ch, method, properties, body):
+        global VIOLATIONS
         global JOB_INDEXES
 
         try:
@@ -111,19 +115,21 @@ def master(encoded_payload):
             if key not in VIOLATIONS or VIOLATIONS[key] != violation_time:
                 VIOLATIONS[key] = violation_time
                 jobkey, call_id = key.rsplit('-', 1)
-                JOB_INDEXES[jobkey].put(int(call_id))
+                JOB_INDEXES[jobkey].append(int(call_id))
             else:
-                proxy.logger(f'Ignoring violation {key}. Already processed')
+                proxy.logger.info(f'Ignoring violation {key}. Already processed')
         except Exception as e:
-            proxy.logger.error(JOB_INDEXES)
+            proxy.logger.error(dict(JOB_INDEXES))
             proxy.logger.error(e)
-            pass
 
     proxy.logger.info(f'Starting consuming from queue {queue} at {rabbit_amqp_url}')
     channel.basic_consume(queue, callback, auto_ack=True)
     threading.Thread(target=channel.start_consuming, daemon=True).start()
 
-    proxy.run(debug=True, host='0.0.0.0', port=MASTER_PORT, use_reloader=False)
+    # proxy.run(debug=True, host='0.0.0.0', port=MASTER_PORT, use_reloader=False)
+
+    server = WSGIServer(('0.0.0.0', MASTER_PORT), proxy, log=proxy.logger)
+    server.serve_forever()
 
 
 def extract_runtime_meta(encoded_payload):
@@ -170,7 +176,7 @@ def run_job(encoded_payload):
 
         if job_index == -1:
             # No Indexes but job not finished
-            time.sleep(1)
+            time.sleep(5)
             continue
 
         if job_index == -2:
