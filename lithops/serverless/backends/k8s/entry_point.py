@@ -75,7 +75,7 @@ def get_id(jobkey, total_calls):
         proxy.logger.info(f'Creating {jobkey} job queue')
         JOB_INDEXES[jobkey] = mp_manager.list()
         JOBS_DONE[jobkey] = mp_manager.list()
-        for call_id in range(int(total_calls)):
+        for call_id in reversed(range(int(total_calls))):
             JOB_INDEXES[jobkey].append(call_id)
 
     try:
