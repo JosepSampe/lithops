@@ -70,7 +70,8 @@ extras_require = {
     'joblib': [
         'joblib',
         'diskcache',
-        'numpy'
+        'numpy',
+        'redis'
     ],
     'plotting': [
         'pandas',
@@ -85,6 +86,18 @@ extras_require = {
         'pytest',
         'kubernetes',
         'pika',
+        'ibm-cos-sdk',
+        'ibm-cloud-sdk-core',
+        'joblib',
+        'diskcache',
+        'numpy',
+        'redis',
+        'pandas',
+        'matplotlib',
+        'seaborn',
+        'flask',
+        'gevent',
+        'scikit-learn',
     ]
 }
 
