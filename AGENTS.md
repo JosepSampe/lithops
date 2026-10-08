@@ -33,6 +33,9 @@ pytest -v --backend localhost --storage localhost -k test_map    # a subset
 pytest --collect-only                                            # list the tests
 ```
 
+Run every command with the Python interpreter that has this checkout installed in editable mode
+(`pip show lithops` shows the *Editable project location*).
+
 **Always pass `--backend localhost --storage localhost`.** Without them the test session
 loads the developer's own configuration (`~/.lithops/config`, `.lithops_config`,
 `LITHOPS_CONFIG_FILE`) and runs against whatever cloud account it points to. Some tests need a
@@ -89,12 +92,15 @@ requests that touch the docs must build without warnings: CI runs that same comm
 
 ## Conventions
 
-- Python 3.10 - 3.14 (the versions CI tests). Match the style of the surrounding code;
+- Python 3.11 - 3.14 (the versions CI tests). Match the style of the surrounding code;
   `ruff check .` clean with line length 120. Do not run `ruff format`: the code base is not
   formatted with it and it would rewrite almost every file.
 - Package metadata, dependencies and extras live in `pyproject.toml`. When adding a
   dependency to an extra, also add it to the `all` extra (except the `dev` and `docs` tooling
   extras).
+- Before reporting a change as done, run `ruff check .` and the localhost test suite (plus the
+  strict docs build when the docs change). Run long jobs (full test suite, Docker / runtime
+  builds, docs builds) in the background when your tool allows it.
 - Every bug fix includes a regression test; every feature includes tests of its behaviour.
   Tests must run on the localhost backend and storage; backend-specific code that cannot be
   exercised locally is tested with fakes or mocks.
@@ -117,5 +123,7 @@ requests that touch the docs must build without warnings: CI runs that same comm
   Azure, IBM Cloud, Aliyun, Oracle, Kubernetes clusters) and do not build or push runtime
   images without the maintainer's explicit approval: it creates billable resources and uses
   real credentials.
+- Do not publish anything (releases, PyPI packages, the docs site) without the maintainer's
+  explicit approval.
 - Never commit credentials or configuration files (`~/.lithops/config`, `.lithops_config`).
 - Do not commit or push unless asked to.

@@ -318,7 +318,7 @@ Build a new VM image.
 ``lithops image list``
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Lists all Ubuntu 22 VM images.
+Lists the available Ubuntu LTS VM images and the Lithops images built with ``lithops image build``.
 
 +-----------------+-----------------------------------+
 | Parameter       | Description                       |

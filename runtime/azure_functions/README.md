@@ -2,7 +2,7 @@
 
 The runtime is the place where your functions are executed. The default runtime is automatically created the first time you execute a function. Lithops automatically detects the Python version of your environment and deploys the default runtime based on it.
 
-Currently, Azure Functions supports Python 3.10, 3.11, 3.12, 3.13 and 3.14 (3.14 is in preview). You can find the list of pre-installed modules [here](https://github.com/Azure/azure-functions-python-worker/wiki/Preinstalled-Python-Libraries). In addition, the Lithops default runtimes are built with the packages included in this [requirements.txt](requirements.txt) file
+Currently, Azure Functions supports Python 3.11, 3.12, 3.13 and 3.14. You can find the list of pre-installed modules [here](https://github.com/Azure/azure-functions-python-worker/wiki/Preinstalled-Python-Libraries). In addition, the Lithops default runtimes are built with the packages included in this [requirements.txt](requirements.txt) file
 
 To run a function with the default runtime you don't need to specify anything in the code, since everything is handled internally by Lithops:
 

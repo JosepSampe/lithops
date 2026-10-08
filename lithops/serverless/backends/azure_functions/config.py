@@ -35,7 +35,7 @@ DEFAULT_CONFIG_KEYS = {
     'trigger': 'pub/sub'
 }
 
-AVAILABLE_PY_RUNTIMES = ['3.10', '3.11', '3.12', '3.13', '3.14']
+AVAILABLE_PY_RUNTIMES = ['3.11', '3.12', '3.13', '3.14']
 
 FLEX_INSTANCE_MEMORY = {512, 2048, 4096}
 

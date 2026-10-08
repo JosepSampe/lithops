@@ -1,9 +1,9 @@
-# Python 3.10
-FROM continuumio/miniconda3:23.3.1-0
+# Python 3.14
+FROM continuumio/miniconda3:26.7.1-1
 
 # YOU MUST PIN THE PYTHON VERSION TO PREVENT IT TO BE UPDATED
-# For python 3.10 use "python==3.10.10"
-RUN echo "python==3.10.10" >> /opt/conda/conda-meta/pinned
+# For python 3.14 use "python=3.14"
+RUN echo "python=3.14" >> /opt/conda/conda-meta/pinned
 
 
 RUN apt-get update && apt-get install -y \

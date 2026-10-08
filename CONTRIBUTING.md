@@ -59,7 +59,7 @@ pytest -v --backend aws_lambda --storage aws_s3
 pytest -v --config /path/to/config.yaml --backend code_engine --storage ibm_cos --region eu-de
 ```
 
-CI runs the localhost suite on Python 3.10 - 3.14 for every pull request; cloud backends are
+CI runs the localhost suite on Python 3.11 - 3.14 for every pull request; cloud backends are
 not exercised in CI, so mention in your pull request which backend you tested on.
 
 ## Code conventions

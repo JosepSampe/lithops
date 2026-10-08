@@ -18,7 +18,7 @@ Follow the [IBM VPC setup](https://cloud.ibm.com/vpc-ext/overview) if you need t
 ## Choose an operating system image for VSI
 Any Virtual Server Instance (VSI) needs to define the instance's operating system and version. Lithops supports both standard Ubuntu operating system choices provided by the VPC and pre-defined custom images that already contain all dependencies required by Lithops.
 
-- Option 1: Lithops is compatible with any Ubuntu 22.04 image provided in IBM Cloud. In this case, no further action is required and you can continue to the next step. Lithops will install all required dependencies in the VSI by itself. Note that this can take about 3 minutes to complete all installations.
+- Option 1: Lithops is compatible with any Ubuntu 24.04 image provided in IBM Cloud. In this case, no further action is required and you can continue to the next step. Lithops will install all required dependencies in the VSI by itself. Note that this can take about 3 minutes to complete all installations.
 
 - Option 2: Alternatively, you can use a pre-built custom image (based on Ubuntu) that will greatly improve VSI creation time for Lithops jobs. To benefit from this approach, navigate to [runtime/ibm_vpc](https://github.com/lithops-cloud/lithops/tree/master/runtime/ibm_vpc), and follow the instructions.
 
@@ -90,7 +90,7 @@ ibm_vpc:
 |ibm_vpc | subnet_id | | no | Subnet id of an existing VPC. Get it from [here](https://cloud.ibm.com/vpc-ext/network/subnets)|
 |ibm_vpc | ssh_key_id | | no | SSH public key id. Get it from [here](https://cloud.ibm.com/vpc-ext/compute/sshKeys)|
 |ibm_vpc | gateway_id | | no | Gateway id. Get it from [here](https://cloud.ibm.com/vpc-ext/network/publicGateways)|
-|ibm_vpc | image_id | | no | Virtual machine image id. Default is Ubuntu Server 22.04 |
+|ibm_vpc | image_id | | no | Virtual machine image id. Default is Ubuntu Server 24.04 |
 |ibm_vpc | runtime | python3 | no | Runtime name to run the functions. Can be a container image name. If not set Lithops will use the default python3 interpreter of the VM |
 |ibm_vpc | ssh_username | root |no | Username to access the VM |
 |ibm_vpc | ssh_password |  |no | Password for accessing the worker VMs. If not provided, it is created randomly|
@@ -136,7 +136,7 @@ ibm_vpc:
 
 If you need to create a new VM, follow the steps below to create the VM and update the Lithops configuration:
 
-1. Create an Ubuntu 22.04 virtual server instance (VSI) in [IBM VPC virtual server instances UI](https://cloud.ibm.com/vpc-ext/compute/vs) with CPUs and RAM needed for your application.
+1. Create an Ubuntu 24.04 virtual server instance (VSI) in [IBM VPC virtual server instances UI](https://cloud.ibm.com/vpc-ext/compute/vs) with CPUs and RAM needed for your application.
 2. Reserve and associate a floating IP address in the [IBM VPC floating IPs UI](https://cloud.ibm.com/vpc-ext/network/floatingIPs) to be used for the virtual server instance.
 3. Get the floating IP address of your virtual server instance, which can be found [here](https://cloud.ibm.com/vpc-ext/network/floatingIPs).
 4. Get the endpoint of your subnet region. The endpoint URLs list can be found [here](https://cloud.ibm.com/apidocs/vpc#endpoint-url).

@@ -1,6 +1,6 @@
 # Virtual Machine
 
-Lithops can run functions using a remote host or a virtual machine (VM). In this backend, Lithops uses all the available VM CPUs to parallelize the tasks of a job. For testing purposes, it is preferable to have an Ubuntu > 22.04 host.
+Lithops can run functions using a remote host or a virtual machine (VM). In this backend, Lithops uses all the available VM CPUs to parallelize the tasks of a job. For testing purposes, it is preferable to have an Ubuntu 24.04 (or later) host.
 
 ## Configuration
 

@@ -1,10 +1,7 @@
 
 
-# Python 3.10
-FROM python:3.10-slim-bookworm
-
-# Python 3.11
-#FROM python:3.11-slim-bookworm
+# Python 3.14
+FROM python:3.14-slim-bookworm
 
 RUN apt-get update && apt-get install -y \
         zip \

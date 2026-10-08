@@ -1,10 +1,7 @@
 
 
-# Python 3.10
-FROM python:3.10-slim-trixie
-
-# Python 3.11
-#FROM python:3.11-slim-trixie
+# Python 3.14
+FROM python:3.14-slim-trixie
 
 RUN apt-get update \
     # Install aws-lambda-cpp build dependencies

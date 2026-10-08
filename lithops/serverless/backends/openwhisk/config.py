@@ -17,7 +17,6 @@
 import os
 
 AVAILABLE_PY_RUNTIMES = {
-    '3.10': 'docker.io/lithopscloud/openwhisk-python-v310',
     '3.11': 'docker.io/lithopscloud/openwhisk-python-v311',
     '3.12': 'docker.io/lithopscloud/openwhisk-python-v312'
 }

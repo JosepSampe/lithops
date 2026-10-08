@@ -2,6 +2,9 @@
 
 ## [v3.8.1.dev0]
 
+### Removed
+- [Python] Removed support for Python 3.10, which reached end of life in October 2026.
+
 ## [v3.8.0]
 
 ### Added

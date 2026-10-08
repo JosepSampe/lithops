@@ -26,13 +26,12 @@ authors = [
 ]
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Natural Language :: English",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -215,7 +214,7 @@ include = ["lithops*"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 # same scope flake8 had: the package only, not the examples, docs or runtime files
 extend-exclude = ["examples", "docs", "runtime", "config"]
 # apply the excludes to files passed explicitly too (pre-commit, editors)

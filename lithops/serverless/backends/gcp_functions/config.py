@@ -29,7 +29,6 @@ RUNTIME_MEMORY_MAX = 32768  # 32GB
 RUNTIME_MEMORY_OPTIONS = {128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768}
 
 AVAILABLE_PY_RUNTIMES = {
-    '3.10': 'python310',
     '3.11': 'python311',
     '3.12': 'python312',
     '3.13': 'python313',

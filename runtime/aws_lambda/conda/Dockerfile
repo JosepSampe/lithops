@@ -1,11 +1,10 @@
-FROM public.ecr.aws/lambda/python:3.10
+FROM public.ecr.aws/lambda/python:3.14
 
 ARG FUNCTION_DIR
 
 # Update libs
-RUN yum update -y && \
-    yum install -y wget unzip && \
-    yum clean all
+RUN dnf install -y wget unzip && \
+    dnf clean all
 
 # Install conda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh && \
@@ -37,10 +36,10 @@ RUN /opt/conda-env/bin/pip install --upgrade --no-cache-dir --ignore-installed \
 # RUN /opt/conda-env/bin/pip install --upgrade --no-cache-dir --ignore-installed
 
 # Replace python intepreter with conda's
-RUN mv /var/lang/bin/python3.10 /var/lang/bin/python3.10-clean && \
-    ln -sf /opt/conda-env/bin/python /var/lang/bin/python3.10
+RUN mv /var/lang/bin/python3.14 /var/lang/bin/python3.14-clean && \
+    ln -sf /opt/conda-env/bin/python /var/lang/bin/python3.14
 
-ENV PYTHONPATH="/var/lang/lib/python3.10/site-packages:${FUNCTION_DIR}"
+ENV PYTHONPATH="/var/lang/lib/python3.14/site-packages:${FUNCTION_DIR}"
 
 ENV PATH="${PATH}:/opt/conda-env/bin/"
 

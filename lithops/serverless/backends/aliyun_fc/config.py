@@ -54,8 +54,6 @@ CMD exec gunicorn --bind 0.0.0.0:${CAPort} --workers 1 --timeout 600 --keep-aliv
 """
 
 AVAILABLE_PY_RUNTIMES = {
-    '3.9': 'python3.9',
-    '3.10': 'python3.10',
     '3.12': 'python3.12',
 }
 

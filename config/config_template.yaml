@@ -307,7 +307,7 @@
     #subnet_id: <SUBNET_ID>
     #ssh_key_id: <SSH_PUBLIC_KEY_ID>
     #gateway_id: <PUBLIC_GATEWAY_ID>
-    #image_id: <IMAGE_ID>                 # Default: Ubuntu Server 22.04
+    #image_id: <IMAGE_ID>                 # Default: Ubuntu Server 24.04
     #instance_id: <INSTANCE_ID>           # Mandatory in consume mode
     #floating_ip: <FLOATING_IP>           # Mandatory in consume mode
     #ssh_username: root

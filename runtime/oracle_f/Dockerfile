@@ -3,9 +3,6 @@
 # Python 3.12
 FROM python:3.12-slim-bookworm
 
-# Python 3.11
-#FROM python:3.11-slim-bookworm
-
 RUN apt-get update \
     && apt-get install -y \
     zip \

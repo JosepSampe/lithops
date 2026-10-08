@@ -4,7 +4,7 @@ The runtime is the place where your functions are executed. The default runtime 
 
 Aliyun FC supports two Lithops deploy modes (set `deploy_mode` under `aliyun_fc` in config):
 
-- **`runtime`** (default): zip package + managed Python runtime (`python3.10`, `python3.12`, region-dependent).
+- **`runtime`** (default): zip package + managed Python runtime (`python3.12`, in public preview and region-dependent).
 - **`custom-container`**: Docker image; see [Custom container mode](#custom-container-mode) below.
 
 For managed runtimes, see pre-installed modules [here](https://www.alibabacloud.com/help/en/functioncompute/fc/user-guide/python/). Lithops default zip runtimes use [requirements.txt](requirements.txt):
@@ -83,4 +83,4 @@ res = lith.get_result()
 print(res)
 ```
 
-Note that both the client and the runtime must have the same Python version. If you are running Lithops, for example, with Python 3.10, `my_matplotlib_runtime` will be a Python 3.10 runtime with the extra modules specified installed.
+Note that both the client and the runtime must have the same Python version. If you are running Lithops, for example, with Python 3.12, `my_matplotlib_runtime` will be a Python 3.12 runtime with the extra modules specified installed.
