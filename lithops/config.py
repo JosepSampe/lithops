@@ -19,7 +19,9 @@ import os
 import copy
 import json
 import importlib
+import ipaddress
 import logging
+from urllib.parse import urlsplit
 
 from lithops import constants as c
 from lithops.version import __version__
@@ -263,8 +265,54 @@ def default_config(
 
     _load_monitoring_backend_config(config_data)
     _load_telemetry_backend_config(config_data)
+    _check_loopback_addresses(config_data)
 
     return config_data
+
+
+# The keys of a storage or monitoring section that hold the address workers connect to
+_ADDRESS_KEYS = ('host', 'endpoint', 'amqp_url')
+
+
+def _is_loopback(address):
+    """Whether a host, host:port or URL names this machine"""
+    try:
+        return ipaddress.ip_address(address).is_loopback
+    except ValueError:
+        pass
+    host = urlsplit(address if '://' in address else '//' + address).hostname
+    if host == 'localhost':
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _check_loopback_addresses(config_data):
+    """
+    Refuses a storage or monitoring service at a loopback address for
+    serverless workers, which run in containers of their own where that
+    address is the worker itself. Standalone workers only get a warning: an
+    SSH tunnel can bring the service to the loopback address of the VM
+    """
+    lithops_cfg = config_data['lithops']
+    mode = lithops_cfg.get('mode')
+    if mode == c.LOCALHOST:
+        return
+    for section in (lithops_cfg.get('storage'), lithops_cfg.get('monitoring')):
+        for key in _ADDRESS_KEYS:
+            address = (config_data.get(section) or {}).get(key)
+            if not isinstance(address, str) or not _is_loopback(address):
+                continue
+            msg = (
+                f"{section}.{key} '{address}' is a loopback address, which the "
+                f"{lithops_cfg['backend']} workers cannot reach. Set it to an "
+                "address they can reach"
+            )
+            if mode == c.SERVERLESS:
+                raise Exception(msg)
+            logger.warning(msg)
 
 
 def _load_monitoring_backend_config(config_data):

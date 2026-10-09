@@ -1,4 +1,5 @@
 import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from lithops import FunctionExecutor
 from lithops import RetryingFunctionExecutor
 from lithops.retries import RetryingFuture
+from lithops.utils import FuturesList
 from lithops.wait import ALWAYS, ANY_COMPLETED
 
 
@@ -317,6 +319,30 @@ class TestRetryingFunctionExecutorUnit:
         assert still_pending == [pending_f]
         assert inner.wait.call_count == 1
 
+    def test_wait_a_percentage_returns_once_that_share_is_done(self):
+        """A percentage return_when used to loop for ever, even with every call done"""
+        finished = [FakeResponseFuture(error=False, result=i) for i in range(2)]
+        pending = [FakeResponseFuture() for _ in range(2)]
+        inner = MagicMock()
+        inner.config = {}
+        inner.wait.return_value = (finished, pending)
+        fs = [RetryingFuture(f, map_function=lambda x: x, input=i, retries=0)
+              for i, f in enumerate(finished + pending)]
+        executor = RetryingFunctionExecutor(inner)
+        done, still_pending = executor.wait(fs, return_when=50)
+        assert done == fs[:2]
+        assert still_pending == fs[2:]
+        assert inner.wait.call_count == 1
+
+    def test_wait_on_no_futures_returns_at_once(self):
+        """ANY_COMPLETED used to wait for ever for one of no futures"""
+        inner = MagicMock()
+        inner.config = {}
+        inner.wait.side_effect = [([], [])]
+        executor = RetryingFunctionExecutor(inner)
+        assert executor.wait([], return_when=ANY_COMPLETED) == ([], [])
+        assert executor.wait([]) == ([], [])
+
     def test_wait_exhausted_retries_are_treated_as_done(self):
         failed = FakeResponseFuture(error=True)
         inner = MagicMock()
@@ -347,3 +373,111 @@ class TestRetryingFunctionExecutorUnit:
         assert executor._retries_to_use(None) == 9
         executor.config = {}
         assert executor._retries_to_use(None) == 0
+
+
+def test_wait_retries_with_the_default_throw_except(tmp_path):
+    """The first failure used to end the wait instead of being retried"""
+    timing_map = {0: [-1]}
+
+    def partial_map_function(x):
+        return deterministic_failure(tmp_path, timing_map, x)
+
+    fexec = FunctionExecutor(config=pytest.lithops_config)
+    with RetryingFunctionExecutor(fexec) as executor:
+        futures = executor.map(partial_map_function, range(2), retries=1)
+        done, pending = executor.wait(futures)
+    assert pending == []
+    assert sorted(f.result() for f in done) == [0, 1]
+    check_invocation_counts(tmp_path, timing_map, 2, retries=1)
+
+
+def test_wait_raises_by_default_once_retries_are_exhausted(tmp_path):
+    timing_map = {0: [-1, -1]}
+
+    def partial_map_function(x):
+        return deterministic_failure(tmp_path, timing_map, x)
+
+    fexec = FunctionExecutor(config=pytest.lithops_config)
+    with RetryingFunctionExecutor(fexec) as executor:
+        futures = executor.map(partial_map_function, range(2), retries=1)
+        with pytest.raises(RuntimeError, match='Deliberately fail'):
+            executor.wait(futures)
+    check_invocation_counts(tmp_path, timing_map, 2, retries=1)
+
+
+def _count_lines(obj):
+    return obj.data_stream.read().count(b'\n')
+
+
+class TestRetryingThrowExcept:
+
+    def test_result_and_status_honour_throw_except_false(self):
+        future = RetryingFuture(FakeResponseFuture(error=True, result='partial'), lambda x: x, 1)
+        assert future.result(throw_except=False) == 'partial'
+        assert future.status(throw_except=False) == 'ok'
+
+    def test_inner_wait_never_raises_and_the_outer_one_reraises_at_the_end(self):
+        first = FakeResponseFuture(error=True)
+        still_failing = FakeResponseFuture(error=True)
+        inner = MagicMock()
+        inner.config = {}
+        inner.wait.side_effect = [([first], []), ([still_failing], [])]
+        inner.map.return_value = [still_failing]
+        retrying = RetryingFuture(first, map_function=lambda x: x, input=1, retries=1)
+
+        with pytest.raises(RuntimeError, match='failed'):
+            RetryingFunctionExecutor(inner).wait([retrying])
+
+        assert inner.map.call_count == 1
+        assert [c.kwargs['throw_except'] for c in inner.wait.call_args_list] == [False, False]
+
+
+class TestRetryingMapInputs:
+
+    @staticmethod
+    def _inner(n_futures):
+        inner = MagicMock()
+        inner.config = {}
+        inner.map.return_value = [FakeResponseFuture() for _ in range(n_futures)]
+        return inner
+
+    @pytest.mark.parametrize('chunks', [{'obj_chunk_number': 2}, {'obj_chunk_size': 64}])
+    def test_object_chunks_are_refused_before_invoking(self, chunks):
+        inner = self._inner(4)
+        with pytest.raises(ValueError, match='obj_chunk'):
+            RetryingFunctionExecutor(inner).map(
+                _count_lines, ['localhost://bucket/a.txt', 'localhost://bucket/b.txt'], **chunks
+            )
+        inner.map.assert_not_called()
+
+    def test_an_input_that_holds_several_objects_is_an_error(self):
+        """A prefix expands into one call per object, which cannot be retried"""
+        inner = self._inner(3)
+        with pytest.raises(ValueError, match='cannot be retried'):
+            RetryingFunctionExecutor(inner).map(_count_lines, ['localhost://bucket/prefix/'])
+
+    def test_single_objects_get_one_future_each(self, tmp_path):
+        local_file = tmp_path / 'a.txt'
+        local_file.write_text('x\n')
+        iterdata = ['localhost://bucket/a.txt', str(local_file)]
+        inner = self._inner(2)
+        futures = RetryingFunctionExecutor(inner).map(_count_lines, iterdata)
+        assert [f.input for f in futures] == iterdata
+
+    def test_more_calls_than_inputs_is_an_error(self):
+        inner = self._inner(3)
+        with pytest.raises(ValueError, match='cannot be retried'):
+            RetryingFunctionExecutor(inner).map(lambda x: x, [1, 2])
+
+    def test_a_generator_is_paired_with_its_futures(self):
+        inner = self._inner(3)
+        futures = RetryingFunctionExecutor(inner).map(lambda x: x, (i for i in range(3)))
+        assert [f.input for f in futures] == [0, 1, 2]
+        assert inner.map.call_args.args[1] == [0, 1, 2]
+
+    def test_a_chain_after_map_reduce_pairs_the_reduce_future_only(self):
+        map_stage = [SimpleNamespace(_mapreduce_map=True) for _ in range(3)]
+        reducer = SimpleNamespace(_mapreduce_map=False)
+        inner = self._inner(1)
+        futures = RetryingFunctionExecutor(inner).map(lambda x: x, FuturesList(map_stage + [reducer]))
+        assert [f.input for f in futures] == [reducer]

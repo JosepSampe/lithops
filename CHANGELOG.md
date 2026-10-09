@@ -2,6 +2,14 @@
 
 ## [v3.8.1.dev0]
 
+### Fixed
+- [Core] Chaining, cleanup, invocation errors, generator inputs, empty `fs`, `wait()` timeouts (threads, SIGALRM, `ANY_COMPLETED`), argument binding and `RetryingFunctionExecutor` retries and percentage waits; object partitioning is now rejected by the retrying executor, and a storage or monitoring service at a loopback address is refused for serverless workers (a warning for standalone).
+- [Worker] Partitioned object streams (lost, duplicated or cut rows, rows longer than 128 KB, multi-byte `obj_newline`, `readline()`, iteration), module discovery of nested functions, a parameter named `future`, and `extra_env` restoring the previous environment.
+- [Localhost] Absolute interpreter paths are accepted as runtime; storage listing is a literal prefix match including dotfiles, and open-ended byte ranges are supported.
+- [Storage] `CloudFileProxy` path handling (`isfile`, `listdir`, `exists`, leading `/`), double `close()`, and `r+` mode writing back.
+- [Monitoring] Worker tokens of jobs dropped by `wait()`, replaced monitors and restarted invokers are handed back once, and a held `__end__` is no longer replaced by an `__init__`.
+- [Concurrent] `wait()` and `as_completed()` accept generators.
+
 ## [v3.8.0]
 
 ### Added

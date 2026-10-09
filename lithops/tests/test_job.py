@@ -13,6 +13,7 @@
 #
 
 import errno
+import json
 import logging
 import os
 import pickle
@@ -710,6 +711,37 @@ class TestSerializeIndependent:
         ser = SerializeIndependent([['os', True]])
         mods = ser._module_inspect({'fn': _echo, 'n': 1})
         assert _echo.__module__.split('.')[0] in mods
+
+    def test_module_used_only_by_a_nested_function_is_found(self):
+        """
+        The global names of an inner function belong to the module of the
+        outer one, such as the __main__ of a script, not to the serializer's
+        """
+        namespace = {'__name__': '__main__', 'helper_mod_xyz': json}
+        exec(
+            'def outer():\n'
+            '    def inner():\n'
+            '        return helper_mod_xyz.dumps(1)\n'
+            '    return inner()\n',
+            namespace
+        )
+        ser = SerializeIndependent([['os', True]])
+        assert 'json' in ser._module_inspect(namespace['outer'])
+
+    def test_recursive_functions_are_inspected_once(self):
+        namespace = {'__name__': '__main__', 'helper_mod_xyz': json}
+        exec(
+            'def fact(n):\n'
+            '    return 1 if n < 2 else n * fact(n - 1)\n'
+            'def ping(n):\n'
+            '    return pong(n - 1) if n else helper_mod_xyz.dumps(n)\n'
+            'def pong(n):\n'
+            '    return ping(n - 1) if n else 0\n',
+            namespace
+        )
+        ser = SerializeIndependent([['os', True]])
+        assert ser._module_inspect(namespace['fact']) == {'__main__'}
+        assert 'json' in ser._module_inspect(namespace['pong'])
 
     def test_cython_function_name_inspects_globals(self):
         class cython_function_or_method:

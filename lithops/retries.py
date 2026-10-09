@@ -12,11 +12,13 @@
 # limitations under the License.
 #
 
+from collections.abc import Iterator
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from lithops import FunctionExecutor
 from lithops.future import ResponseFuture
 from lithops.storage.utils import CloudObject
+from lithops.utils import _as_iterdata_list, _chained_futures, is_object_processing_function
 from lithops.wait import (
     ALL_COMPLETED,
     ALWAYS,
@@ -136,7 +138,8 @@ class RetryingFuture:
             internal_storage=internal_storage,
             check_only=check_only,
         )
-        self._reraise_if_error()
+        if throw_except:
+            self._reraise_if_error()
         return stat
 
     def result(self, throw_except: bool = True, internal_storage: Any = None):
@@ -150,7 +153,8 @@ class RetryingFuture:
         res = self.response_future.result(
             throw_except=throw_except, internal_storage=internal_storage
         )
-        self._reraise_if_error()
+        if throw_except:
+            self._reraise_if_error()
         return res
 
 
@@ -239,6 +243,14 @@ class RetryingFunctionExecutor:
             function activation.
         """
 
+        # A retry resubmits the input of the call that failed, and a single
+        # partition of an object cannot be resubmitted on its own
+        if (obj_chunk_size or obj_chunk_number) and is_object_processing_function(map_function):
+            raise ValueError(
+                'RetryingFunctionExecutor does not support obj_chunk_size or '
+                'obj_chunk_number: a failed partition cannot be retried on its '
+                'own. Use FunctionExecutor to process objects in chunks'
+            )
         retries_to_use = self._retries_to_use(retries)
 
         map_kwargs = dict(
@@ -254,11 +266,27 @@ class RetryingFunctionExecutor:
             exclude_modules=exclude_modules,
         )
 
+        # A generator can be read only once, and the inputs are kept to be
+        # resubmitted on a retry
+        if isinstance(map_iterdata, Iterator):
+            map_iterdata = list(map_iterdata)
+        # The future of each call is paired with the input it was made from.
+        # A chain leaves out the futures that produce no input
+        inputs = _chained_futures(map_iterdata)
+        if inputs is None:
+            inputs = _as_iterdata_list(map_iterdata)
+
         futures_list = self.executor.map(
             map_function,
             map_iterdata,
             **map_kwargs,
         )
+        if len(futures_list) != len(inputs):
+            raise ValueError(
+                f'The {len(inputs)} inputs turned into {len(futures_list)} '
+                'calls, which are running now but cannot be retried: a retry '
+                'resubmits the input of the call that failed'
+            )
         return [
             RetryingFuture(
                 f,
@@ -267,7 +295,7 @@ class RetryingFunctionExecutor:
                 retries=retries_to_use,
                 **map_kwargs,
             )
-            for i, f in zip(map_iterdata, futures_list)
+            for i, f in zip(inputs, futures_list)
         ]
 
     def _split_done_and_retried(self, done, pending, lookup):
@@ -310,7 +338,11 @@ class RetryingFunctionExecutor:
             return bool(retrying_done)
         if return_when == ALL_COMPLETED:
             return not retrying_pending
-        return False
+        # A percentage of the calls, as lithops.wait() takes it
+        total = len(retrying_done) + len(retrying_pending)
+        if not total:
+            return True
+        return len(retrying_done) * 100 / total >= return_when
 
     def wait(
         self,
@@ -338,14 +370,18 @@ class RetryingFunctionExecutor:
 
         :return: A tuple (done, pending) of lists of RetryingFutures.
         """
+        if not fs:
+            return [], []
         lookup = {f.response_future: f for f in fs}
 
         while True:
             # A retry replaces the response future of a RetryingFuture, so
-            # the list has to be rebuilt on every round
+            # the list has to be rebuilt on every round. The inner wait never
+            # raises: a call that failed would end the whole wait there, and
+            # the executor would discard every future instead of retrying it
             done, pending = self.executor.wait(
                 [f.response_future for f in fs],
-                throw_except=throw_except,
+                throw_except=False,
                 return_when=return_when,
                 download_results=download_results,
                 timeout=timeout,
@@ -361,6 +397,10 @@ class RetryingFunctionExecutor:
             if self._wait_is_over(
                 return_when, retrying_done, retrying_pending
             ):
+                if throw_except:
+                    # Only the calls with no retries left are still failed
+                    for retrying_future in retrying_done:
+                        retrying_future._reraise_if_error()
                 return retrying_done, retrying_pending
 
     def clean(
